@@ -44,7 +44,7 @@ function ScoreBar({ label, icon, value, max, unit, level }: {
 }
 
 function FactorCard({ title, icon, note, level, impact }: {
-  title: string; icon: React.ReactNode; note: string; level: Level; impact: "positive" | "neutral" | "negative";
+  title: string; icon: React.ReactNode; note: string; level: Level; impact: "positive" | "neutral" | "negative"; riskLabel: string;
 }) {
   const color = LC[level];
   const ImpactIcon = impact === "positive" ? TrendingUp : impact === "negative" ? TrendingDown : Minus;
@@ -57,7 +57,7 @@ function FactorCard({ title, icon, note, level, impact }: {
       <p className="text-[13px] text-slate-400">{note}</p>
       <div className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5" style={{ background: `${color}12`, border: `1px solid ${color}20` }}>
         <span className="h-[6px] w-[6px] rounded-full" style={{ background: color }} />
-        <span className="text-[11px] font-medium" style={{ color }}>{getRiskNote(title.toLowerCase().includes("vento") ? "wind" : title.toLowerCase().includes("rajada") ? "gust" : title.toLowerCase().includes("chuva") ? "rain" : "temp", 0)}</span>
+        <span className="text-[11px] font-medium" style={{ color }}>{riskLabel}</span>
       </div>
     </div>
   );
@@ -167,12 +167,13 @@ export default function Analise() {
         <section className="mb-6">
           <h2 className="mb-4 text-[18px] font-bold tracking-tight">Detalhes por fator</h2>
           <div className="grid grid-cols-2 gap-3">
-            <FactorCard
+           <FactorCard
               title="Vento"
               icon={<Wind size={16} />}
               note={`${wind} km/h — ${getRiskNote("wind", wind).toLowerCase()}. ${wind <= 10 ? "Condições ideais para voo estável." : wind <= 20 ? "Voo possível com atenção extra." : "Risco alto de instabilidade."}`}
               level={windLevel}
               impact={windImpact}
+              riskLabel={getRiskNote("wind", wind)}
             />
             <FactorCard
               title="Rajada"
@@ -180,6 +181,7 @@ export default function Analise() {
               note={`${gust} km/h — ${getRiskNote("gust", gust).toLowerCase()}. ${gust <= 15 ? "Sem variações bruscas." : gust <= 25 ? "Possíveis oscilações." : "Rajadas podem derrubar o drone."}`}
               level={gustLevel}
               impact={gustImpact}
+              riskLabel={getRiskNote("gust", gust)}
             />
             <FactorCard
               title="Chuva"
@@ -187,6 +189,7 @@ export default function Analise() {
               note={`${rainP}% de chance — ${getRiskNote("rain", rainP).toLowerCase()}. ${rainP <= 20 ? "Céu limpo, pode voar." : rainP <= 50 ? "Monitore o céu." : "Alto risco de dano ao equipamento."}`}
               level={rainLevel}
               impact={rainImpact}
+              riskLabel={getRiskNote("rain", rainP)}
             />
             <FactorCard
               title="Temperatura"
@@ -194,7 +197,9 @@ export default function Analise() {
               note={`${temp}°C — ${getRiskNote("temp", temp).toLowerCase()}. ${temp >= 5 && temp <= 35 ? "Faixa segura para bateria e eletrônicos." : "Temperatura pode afetar performance."}`}
               level={tempLevel}
               impact={tempImpact}
+              riskLabel={getRiskNote("temp", temp)}
             />
+
           </div>
         </section>
 
