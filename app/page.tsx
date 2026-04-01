@@ -287,9 +287,9 @@ function Radar({ score, level }: { score: number; level: Level }) {
           </div>
         </section>
 
-        <button className="w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
+        <a href="/analise" className="block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
           Ver análise detalhada
-        </button>
+        </a>
 
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/75 backdrop-blur-xl">
           <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">
