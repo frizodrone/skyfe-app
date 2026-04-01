@@ -16,6 +16,7 @@ const LC: Record<Level, string> = {
   good: "#2dffb3", warn: "#ffd84d", risk: "#ff5a5f",
 };
 
+/* ───── Search Modal ───── */
 function SearchModal({ onSelect, onClose }: { onSelect: (r: any) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
@@ -65,6 +66,7 @@ function SearchModal({ onSelect, onClose }: { onSelect: (r: any) => void; onClos
   );
 }
 
+/* ───── Radar ───── */
 function Radar({ score, level }: { score: number; level: Level }) {
   const color = LC[level];
   const circ = 2 * Math.PI * 62;
@@ -94,7 +96,65 @@ function Radar({ score, level }: { score: number; level: Level }) {
       </div>
     </div>
   );
-}export default function Home() {
+}
+
+/* ───── Metric Card v2 ───── */
+function MetricCard({ icon, title, value, unit, note, level }: {
+  icon: React.ReactNode; title: string; value: string; unit: string; note: string; level: Level;
+}) {
+  const color = LC[level];
+  return (
+    <div
+      className="metric-card-v2 relative flex min-h-[160px] flex-col overflow-hidden rounded-[20px] px-3 py-4 text-center transition-all duration-300"
+      style={{
+        background: `linear-gradient(168deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.015) 100%)`,
+        border: `1px solid ${color}25`,
+        boxShadow: `0 0 20px ${color}08, inset 0 1px 0 rgba(255,255,255,0.04)`,
+      }}
+    >
+      {/* glow accent top */}
+      <div className="absolute -top-4 left-1/2 h-8 w-16 -translate-x-1/2 rounded-full opacity-40 blur-xl" style={{ background: color }} />
+      <div className="relative z-10 mb-2.5 flex justify-center" style={{ color }}>
+        {icon}
+      </div>
+      <p className="relative z-10 min-h-[28px] whitespace-pre-line text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-400">{title}</p>
+      <div className="relative z-10 mt-auto flex flex-1 flex-col items-center justify-center">
+        <p className="text-[26px] font-bold leading-none tracking-tight text-white" style={{ textShadow: `0 0 16px ${color}18` }}>{value}</p>
+        {unit && <p className="mt-1 text-[11px] text-slate-500">{unit}</p>}
+        <p className="mt-2 text-[10px] font-medium" style={{ color: `${color}bb` }}>{note}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ───── Hourly Mini Card ───── */
+function HourlyCard({ item }: { item: HourlyItem }) {
+  const color = LC[item.level];
+  return (
+    <div
+      className="flex flex-shrink-0 flex-col items-center gap-2 rounded-2xl px-4 py-3.5 transition-all duration-200"
+      style={{
+        background: `linear-gradient(180deg, ${color}08 0%, transparent 100%)`,
+        border: `1px solid ${color}20`,
+        minWidth: "72px",
+      }}
+    >
+      <span
+        className="h-[11px] w-[11px] rounded-full"
+        style={{ background: color, boxShadow: `0 0 10px ${color}44` }}
+      />
+      <span className="text-[14px] font-semibold text-slate-100">{item.time}</span>
+      <span className="text-[10px] font-medium" style={{ color: `${color}cc` }}>
+        {item.level === "good" ? "Seguro" : item.level === "warn" ? "Cuidado" : "Risco"}
+      </span>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════ */
+/*                   HOME                      */
+/* ═══════════════════════════════════════════ */
+export default function Home() {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<any>(null);
   const [score, setScore] = useState(0);
@@ -135,6 +195,7 @@ function Radar({ score, level }: { score: number; level: Level }) {
     loadWeather(result.latitude, result.longitude, name);
   }, [loadWeather, loadFromGeo]);
 
+  /* ── hourly data ── */
   const hourly: HourlyItem[] = useMemo(() => {
     if (!weather?.hourly?.time) return [];
     const now = new Date();
@@ -160,18 +221,29 @@ function Radar({ score, level }: { score: number; level: Level }) {
     return null;
   }, [hourly]);
 
+  /* ── derived values ── */
   const wind = weather ? Math.round(weather.current.wind_speed_10m) : 0;
   const gust = weather ? Math.round(weather.current.wind_gusts_10m) : 0;
   const rainP = weather ? (weather.hourly?.precipitation_probability?.[0] ?? 0) : 0;
   const temp = weather ? Math.round(weather.current.temperature_2m) : 0;
 
+  /* ── per-metric risk level ── */
+  function getMetricLevel(type: string, val: number): Level {
+    if (type === "wind") return val <= 15 ? "good" : val <= 25 ? "warn" : "risk";
+    if (type === "gust") return val <= 20 ? "good" : val <= 35 ? "warn" : "risk";
+    if (type === "rain") return val <= 20 ? "good" : val <= 50 ? "warn" : "risk";
+    if (type === "temp") return val >= 5 && val <= 38 ? "good" : val >= 0 && val <= 42 ? "warn" : "risk";
+    return "good";
+  }
+
   const metrics = [
-    { icon: <Wind size={20} />, title: "VENTO\nMÉDIO", value: weather ? `${wind}` : "--", unit: "km/h", note: getRiskNote("wind", wind) },
-    { icon: <Zap size={20} />, title: "RAJADA\nMÁX", value: weather ? `${gust}` : "--", unit: "km/h", note: getRiskNote("gust", gust) },
-    { icon: <CloudRain size={20} />, title: "CHUVA", value: weather ? `${rainP}%` : "--", unit: "", note: getRiskNote("rain", rainP) },
-    { icon: <Thermometer size={20} />, title: "TEMP", value: weather ? `${temp}°` : "--", unit: "", note: getRiskNote("temp", temp) },
+    { icon: <Wind size={20} />, title: "VENTO\nMÉDIO", value: weather ? `${wind}` : "--", unit: "km/h", note: getRiskNote("wind", wind), metricLevel: getMetricLevel("wind", wind) },
+    { icon: <Zap size={20} />, title: "RAJADA\nMÁX", value: weather ? `${gust}` : "--", unit: "km/h", note: getRiskNote("gust", gust), metricLevel: getMetricLevel("gust", gust) },
+    { icon: <CloudRain size={20} />, title: "CHUVA", value: weather ? `${rainP}%` : "--", unit: "", note: getRiskNote("rain", rainP), metricLevel: getMetricLevel("rain", rainP) },
+    { icon: <Thermometer size={20} />, title: "TEMP", value: weather ? `${temp}°` : "--", unit: "", note: getRiskNote("temp", temp), metricLevel: getMetricLevel("temp", temp) },
   ];
 
+  /* ── loading screen ── */
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
@@ -183,13 +255,18 @@ function Radar({ score, level }: { score: number; level: Level }) {
     );
   }
 
+  /* ═══ RENDER ═══ */
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#04090f] text-white">
+      {/* ambient bg glow */}
       <div className="pointer-events-none fixed inset-0 opacity-80">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_34%)]" />
       </div>
+
       {showSearch && <SearchModal onSelect={handleSearchSelect} onClose={() => setShowSearch(false)} />}
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-28 pt-5">
+
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-24 pt-5">
+        {/* ─── Header ─── */}
         <header className="mb-5 flex items-center justify-between">
           <div className="grid h-12 w-12 place-items-center rounded-[20px] border border-cyan-400/[0.12] bg-white/[0.03]">
             <div className="relative h-[18px] w-[18px]">
@@ -211,6 +288,7 @@ function Radar({ score, level }: { score: number; level: Level }) {
           </div>
         </header>
 
+        {/* ─── Location ─── */}
         <div className="mb-6 text-center">
           <p className="inline-flex items-center gap-1.5 text-[17px] font-medium text-slate-100">{placeName} <MapPin size={14} className="text-cyan-400" /></p>
           <p className="mt-1 text-[12px] text-slate-500">dados em tempo real</p>
@@ -218,26 +296,42 @@ function Radar({ score, level }: { score: number; level: Level }) {
 
         {error && <div className="mb-4 rounded-2xl border border-red-400/15 bg-red-400/[0.06] px-4 py-3 text-[14px] text-red-200">{error}</div>}
 
-        <section className="relative mb-5 overflow-hidden rounded-[28px] border border-cyan-400/[0.15] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] px-5 py-6 shadow-[0_0_36px_rgba(45,204,255,0.08)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_26%)]" />
+        {/* ─── Score / Radar Section (v2 — refined frame) ─── */}
+        <section className="relative mb-6 overflow-hidden rounded-[28px] border border-cyan-400/[0.12] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] px-5 py-7 shadow-[0_0_50px_rgba(45,204,255,0.06)]">
+          {/* double border glow */}
+          <div className="pointer-events-none absolute inset-0 rounded-[28px] border border-cyan-400/[0.06]" style={{ margin: "3px" }} />
+          {/* radial glow */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,_rgba(45,204,255,0.1),_transparent_50%)]" />
+          {/* radar rings background */}
           <div className="pointer-events-none absolute left-1/2 top-[33%] h-[250px] w-[250px] -translate-x-1/2 -translate-y-1/2">
-            <div className="absolute inset-0 rounded-full border border-cyan-300/[0.1]" />
-            <div className="absolute inset-[22px] rounded-full border border-cyan-300/[0.08]" />
-            <div className="absolute inset-[44px] rounded-full border border-cyan-300/[0.08]" />
-            <div className="absolute inset-[66px] rounded-full border border-cyan-300/[0.08]" />
-            <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-cyan-300/[0.08]" />
-            <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-cyan-300/[0.08]" />
-            <div className="absolute inset-[18px] rounded-full animate-radar-spin" style={{ background: `conic-gradient(from 310deg, rgba(255,255,255,0.12), ${LC[level]}15, transparent 22%)`, filter: "blur(2px)" }} />
+            <div className="absolute inset-0 rounded-full border border-cyan-300/[0.08]" />
+            <div className="absolute inset-[22px] rounded-full border border-cyan-300/[0.06]" />
+            <div className="absolute inset-[44px] rounded-full border border-cyan-300/[0.06]" />
+            <div className="absolute inset-[66px] rounded-full border border-cyan-300/[0.06]" />
+            <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-cyan-300/[0.06]" />
+            <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-cyan-300/[0.06]" />
+            <div className="absolute inset-[18px] rounded-full animate-radar-spin" style={{ background: `conic-gradient(from 310deg, rgba(255,255,255,0.1), ${LC[level]}12, transparent 20%)`, filter: "blur(3px)" }} />
           </div>
+
           <div className="relative z-10 flex flex-col items-center">
             <Radar score={score} level={level} />
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1" style={{ background: `${LC[level]}10`, border: `1px solid ${LC[level]}18` }}>
+
+            {/* status badge */}
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-1.5"
+              style={{ background: `${LC[level]}10`, border: `1px solid ${LC[level]}20` }}>
               <span className="h-[7px] w-[7px] rounded-full animate-pulse-dot" style={{ background: LC[level] }} />
               <span className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: LC[level] }}>
                 {level === "good" ? "condição ideal" : level === "warn" ? "atenção requerida" : "condição adversa"}
               </span>
             </div>
-            <h2 className="mt-3 text-center text-[28px] font-bold uppercase tracking-tight" style={{ color: LC[level], textShadow: `0 0 20px ${LC[level]}25` }}>{label}</h2>
+
+            {/* main label */}
+            <h2 className="mt-3 text-center text-[28px] font-bold uppercase tracking-tight"
+              style={{ color: LC[level], textShadow: `0 0 24px ${LC[level]}20` }}>
+              {label}
+            </h2>
+
+            {/* quick summary */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-[13px] text-slate-300">
               <span className="inline-flex items-center gap-1.5"><Wind size={13} className="text-slate-400" />{wind <= 15 ? "Vento ideal" : "Vento forte"}</span>
               <span className="inline-flex items-center gap-1.5"><Droplets size={13} className="text-slate-400" />{rainP <= 20 ? "Sem chuva" : "Chuva provável"}</span>
@@ -246,53 +340,58 @@ function Radar({ score, level }: { score: number; level: Level }) {
           </div>
         </section>
 
-        <section className="mb-5 grid grid-cols-4 gap-2.5">
+        {/* ─── Metric Cards v2 (with glow borders) ─── */}
+        <section className="mb-6 grid grid-cols-4 gap-2.5">
           {metrics.map((m) => (
-            <div key={m.title} className="flex min-h-[156px] flex-col rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-3 py-4 text-center">
-              <div className="mb-2 flex justify-center text-slate-300">{m.icon}</div>
-              <p className="min-h-[28px] whitespace-pre-line text-[9px] uppercase leading-tight tracking-[0.1em] text-slate-500">{m.title}</p>
-              <div className="mt-3 flex flex-1 flex-col items-center">
-                <p className="text-[24px] font-semibold leading-none tracking-tight text-white">{m.value}</p>
-                {m.unit && <p className="mt-1 text-[11px] text-slate-500">{m.unit}</p>}
-                <p className="mt-2 text-[11px] text-slate-500">{m.note}</p>
-              </div>
-            </div>
+            <MetricCard
+              key={m.title}
+              icon={m.icon}
+              title={m.title}
+              value={m.value}
+              unit={m.unit}
+              note={m.note}
+              level={m.metricLevel}
+            />
           ))}
         </section>
 
-        <section className="mb-5">
+        {/* ─── Hourly Forecast v2 (mini cards, horizontal scroll) ─── */}
+        <section className="mb-6">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-[20px] font-bold tracking-tight">Previsão por hora</h3>
             <div className="flex items-center gap-3 text-[11px]">
-              <span className="flex items-center gap-1 text-slate-500"><span className="h-[9px] w-[9px] rounded-full bg-[#2dffb3]" />Seguro</span>
-              <span className="flex items-center gap-1 text-slate-500"><span className="h-[9px] w-[9px] rounded-full bg-[#ffd84d]" />Cuidado</span>
-              <span className="flex items-center gap-1 text-slate-500"><span className="h-[9px] w-[9px] rounded-full bg-[#ff5a5f]" />Risco</span>
+              <span className="flex items-center gap-1 text-slate-500"><span className="h-[8px] w-[8px] rounded-full bg-[#2dffb3]" />Seguro</span>
+              <span className="flex items-center gap-1 text-slate-500"><span className="h-[8px] w-[8px] rounded-full bg-[#ffd84d]" />Cuidado</span>
+              <span className="flex items-center gap-1 text-slate-500"><span className="h-[8px] w-[8px] rounded-full bg-[#ff5a5f]" />Risco</span>
             </div>
           </div>
-          <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.025] px-4 py-5">
-            <div className="relative grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(hourly.length || 5, 8)}, 1fr)` }}>
-              <div className="absolute left-[8%] right-[8%] top-[6px] h-px bg-gradient-to-r from-transparent via-white/[0.12] to-transparent" />
-              {hourly.map((h) => (
-                <div key={h.time} className="relative z-10 flex flex-col items-center">
-                  <span className="h-[13px] w-[13px] rounded-full" style={{ background: LC[h.level], boxShadow: `0 0 8px ${LC[h.level]}33` }} />
-                  <span className="mt-2.5 text-[13px] font-medium text-slate-200">{h.time}</span>
-                  <span className="mt-0.5 text-[10px] text-slate-500">{h.level === "good" ? "Seguro" : h.level === "warn" ? "Cuidado" : "Risco"}</span>
-                </div>
-              ))}
-            </div>
-            {bestWindow && (
-              <div className="mt-4 rounded-[14px] border border-cyan-400/[0.1] bg-cyan-400/[0.04] px-3 py-3 text-center">
-                <p className="inline-flex items-center gap-2 text-[13px] text-cyan-300"><LocateFixed size={13} />Próxima janela recomendada entre <span className="font-semibold">{bestWindow}</span></p>
-              </div>
-            )}
+
+          {/* scrollable mini cards */}
+          <div className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
+            {hourly.map((h) => (
+              <HourlyCard key={h.time} item={h} />
+            ))}
           </div>
+
+          {/* best window */}
+          {bestWindow && (
+            <div className="mt-3 rounded-2xl border border-cyan-400/[0.1] bg-cyan-400/[0.04] px-4 py-3 text-center">
+              <p className="inline-flex items-center gap-2 text-[13px] text-cyan-300">
+                <LocateFixed size={13} />
+                Próxima janela recomendada entre <span className="font-semibold">{bestWindow}</span>
+              </p>
+            </div>
+          )}
         </section>
 
-        <a href="/analise" className="block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
+        {/* ─── CTA Button ─── */}
+        <a href="/analise"
+          className="mb-2 block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
           Ver análise detalhada
         </a>
 
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/75 backdrop-blur-xl">
+        {/* ─── Bottom Nav ─── */}
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">
           <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">
             {[
               { icon: <Sun size={21} />, label: "Clima", active: true, href: "/" },
@@ -300,8 +399,11 @@ function Radar({ score, level }: { score: number; level: Level }) {
               { icon: <Clock3 size={21} />, label: "Previsão", active: false, href: "/previsao" },
               { icon: <User size={21} />, label: "Perfil", active: false, href: "/perfil" },
             ].map((tab) => (
-              <Link key={tab.label} href={tab.href} className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
-                <div className={`grid h-8 w-12 place-items-center rounded-xl transition ${tab.active ? "bg-cyan-400/[0.1]" : ""}`}>{tab.icon}</div>
+              <Link key={tab.label} href={tab.href}
+                className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
+                <div className={`grid h-8 w-12 place-items-center rounded-xl transition ${tab.active ? "bg-cyan-400/[0.1]" : ""}`}>
+                  {tab.icon}
+                </div>
                 <span className={tab.active ? "font-semibold" : ""}>{tab.label}</span>
               </Link>
             ))}
