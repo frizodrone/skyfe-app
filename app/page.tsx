@@ -296,7 +296,7 @@ function Radar({ score, level }: { score: number; level: Level }) {
           <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">
             {[
               { icon: <Sun size={21} />, label: "Clima", active: true, href: "/" },
-              { icon: <Map size={21} />, label: "Zonas", active: false, href: "#" },
+              { icon: <Map size={21} />, label: "Zonas", active: false, href: "/zonas" },
               { icon: <Clock3 size={21} />, label: "Previsão", active: false, href: "/previsao" },
               { icon: <User size={21} />, label: "Perfil", active: false, href: "#" },
             ].map((tab) => (
