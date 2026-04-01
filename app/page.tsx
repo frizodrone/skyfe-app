@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import {
   Search, Settings, Wind, Zap, CloudRain, Thermometer,
   Sun, Map, Clock3, User, Eye, Droplets, MapPin, LocateFixed, X,
@@ -38,7 +39,7 @@ function SearchModal({ onSelect, onClose }: { onSelect: (r: any) => void; onClos
         <div className="flex flex-1 items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
           <Search size={18} className="text-slate-400" />
           <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar cidade, bairro..."
+            placeholder="Buscar cidade, bairro, CEP..."
             className="flex-1 bg-transparent text-white text-base outline-none placeholder:text-slate-500" />
         </div>
         <button onClick={onClose} className="grid h-12 w-12 place-items-center rounded-2xl border border-white/8 bg-white/[0.04]">
@@ -294,15 +295,15 @@ function Radar({ score, level }: { score: number; level: Level }) {
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/75 backdrop-blur-xl">
           <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">
             {[
-              { icon: <Sun size={21} />, label: "Clima", active: true },
-              { icon: <Map size={21} />, label: "Zonas", active: false },
-              { icon: <Clock3 size={21} />, label: "Previsão", active: false },
-              { icon: <User size={21} />, label: "Perfil", active: false },
+              { icon: <Sun size={21} />, label: "Clima", active: true, href: "/" },
+              { icon: <Map size={21} />, label: "Zonas", active: false, href: "#" },
+              { icon: <Clock3 size={21} />, label: "Previsão", active: false, href: "/previsao" },
+              { icon: <User size={21} />, label: "Perfil", active: false, href: "#" },
             ].map((tab) => (
-              <button key={tab.label} className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
+              <Link key={tab.label} href={tab.href} className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
                 <div className={`grid h-8 w-12 place-items-center rounded-xl transition ${tab.active ? "bg-cyan-400/[0.1]" : ""}`}>{tab.icon}</div>
                 <span className={tab.active ? "font-semibold" : ""}>{tab.label}</span>
-              </button>
+              </Link>
             ))}
           </div>
         </nav>
