@@ -205,9 +205,9 @@ function Radar({ score, level }: { score: number; level: Level }) {
             <button onClick={() => setShowSearch(true)} className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]">
               <Search size={19} />
             </button>
-            <button className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]">
+            <Link href="/configuracoes" className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]">
               <Settings size={19} />
-            </button>
+            </Link>
           </div>
         </header>
 

@@ -5,21 +5,59 @@ type ScoreInput = {
   temp: number;
 };
 
-export function calculateFlightScore({ wind, gust, rainProb, temp }: ScoreInput) {
+type ScoreLimits = {
+  maxWind: number;
+  maxGust: number;
+  maxRain: number;
+  minTemp: number;
+  maxTemp: number;
+};
+
+const DEFAULTS: ScoreLimits = {
+  maxWind: 20,
+  maxGust: 30,
+  maxRain: 50,
+  minTemp: 5,
+  maxTemp: 38,
+};
+
+export function loadLimits(): ScoreLimits {
+  if (typeof window === "undefined") return DEFAULTS;
+  try {
+    const raw = localStorage.getItem("skyfe-config");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return DEFAULTS;
+}
+
+export function calculateFlightScore(
+  { wind, gust, rainProb, temp }: ScoreInput,
+  limits?: ScoreLimits
+) {
+  const lim = limits || loadLimits();
   let score = 100;
 
-  // Vento — penalidade progressiva
-  if (wind > 8) score -= Math.min(30, Math.round((wind - 8) * 1.5));
+  // Vento — penalidade proporcional ao limite do usuário
+  if (wind > lim.maxWind * 0.4) {
+    const ratio = wind / lim.maxWind;
+    score -= Math.min(30, Math.round(ratio * 30));
+  }
 
-  // Rajada — penalidade progressiva
-  if (gust > 12) score -= Math.min(30, Math.round((gust - 12) * 1.2));
+  // Rajada
+  if (gust > lim.maxGust * 0.4) {
+    const ratio = gust / lim.maxGust;
+    score -= Math.min(30, Math.round(ratio * 30));
+  }
 
-  // Probabilidade de chuva
-  if (rainProb > 10) score -= Math.min(30, Math.round(rainProb * 0.4));
+  // Chuva
+  if (rainProb > lim.maxRain * 0.2) {
+    const ratio = rainProb / lim.maxRain;
+    score -= Math.min(30, Math.round(ratio * 30));
+  }
 
-  // Temperaturas extremas
-  if (temp < 5) score -= 10;
-  if (temp > 38) score -= 10;
+  // Temperatura
+  if (temp < lim.minTemp) score -= 15;
+  if (temp > lim.maxTemp) score -= 15;
 
   score = Math.max(0, Math.min(100, score));
 
@@ -44,29 +82,31 @@ export function getRiskNote(
   type: "wind" | "gust" | "rain" | "temp",
   value: number
 ): string {
+  const lim = loadLimits();
+
   if (type === "wind") {
-    if (value <= 10) return "Ideal";
-    if (value <= 20) return "Moderado";
-    if (value <= 30) return "Elevado";
+    if (value <= lim.maxWind * 0.5) return "Ideal";
+    if (value <= lim.maxWind * 0.8) return "Moderado";
+    if (value <= lim.maxWind) return "Elevado";
     return "Perigoso";
   }
   if (type === "gust") {
-    if (value <= 15) return "Baixo risco";
-    if (value <= 25) return "Moderado";
-    if (value <= 35) return "Alto";
+    if (value <= lim.maxGust * 0.5) return "Baixo risco";
+    if (value <= lim.maxGust * 0.8) return "Moderado";
+    if (value <= lim.maxGust) return "Alto";
     return "Muito alto";
   }
   if (type === "rain") {
     if (value <= 5) return "Nenhuma";
-    if (value <= 30) return "Baixa";
-    if (value <= 60) return "Moderada";
+    if (value <= lim.maxRain * 0.5) return "Baixa";
+    if (value <= lim.maxRain) return "Moderada";
     return "Alta";
   }
   if (type === "temp") {
-    if (value < 5) return "Muito frio";
+    if (value < lim.minTemp) return "Muito frio";
     if (value <= 15) return "Frio";
     if (value <= 30) return "Confortável";
-    if (value <= 38) return "Quente";
+    if (value <= lim.maxTemp) return "Quente";
     return "Extremo";
   }
   return "";
