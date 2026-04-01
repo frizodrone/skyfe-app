@@ -298,7 +298,7 @@ function Radar({ score, level }: { score: number; level: Level }) {
               { icon: <Sun size={21} />, label: "Clima", active: true, href: "/" },
               { icon: <Map size={21} />, label: "Zonas", active: false, href: "/zonas" },
               { icon: <Clock3 size={21} />, label: "Previsão", active: false, href: "/previsao" },
-              { icon: <User size={21} />, label: "Perfil", active: false, href: "#" },
+              { icon: <User size={21} />, label: "Perfil", active: false, href: "/perfil" },
             ].map((tab) => (
               <Link key={tab.label} href={tab.href} className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
                 <div className={`grid h-8 w-12 place-items-center rounded-xl transition ${tab.active ? "bg-cyan-400/[0.1]" : ""}`}>{tab.icon}</div>
