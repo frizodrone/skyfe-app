@@ -105,7 +105,7 @@ function MetricCard({ icon, title, value, unit, note, level }: {
   const color = LC[level];
   return (
     <div
-      className="relative flex min-h-[150px] flex-col overflow-hidden rounded-[18px] px-2.5 py-3.5 text-center transition-all duration-300"
+      className="relative flex min-h-[165px] flex-col overflow-hidden rounded-[18px] px-2.5 py-4 text-center transition-all duration-300"
       style={{
         background: `linear-gradient(168deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 100%)`,
         border: `1px solid ${color}20`,
@@ -266,9 +266,9 @@ export default function Home() {
 
       {showSearch && <SearchModal onSelect={handleSearchSelect} onClose={() => setShowSearch(false)} />}
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-24 pt-5">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-5 pb-28 pt-6">
         {/* ─── Header ─── */}
-        <header className="mb-5 flex items-center justify-between">
+        <header className="mb-6 flex items-center justify-between">
           <div className="grid h-12 w-12 place-items-center rounded-[20px] border border-cyan-400/[0.12] bg-white/[0.03]">
             <div className="relative h-[18px] w-[18px]">
               <span className="absolute left-0 top-0 h-[6px] w-[6px] rounded-full border-[1.5px] border-cyan-400/90" />
@@ -290,7 +290,7 @@ export default function Home() {
         </header>
 
         {/* ─── Location ─── */}
-        <div className="mb-6 text-center">
+        <div className="mb-8 text-center">
           <p className="inline-flex items-center gap-1.5 text-[17px] font-medium text-slate-100">{placeName} <MapPin size={14} className="text-cyan-400" /></p>
           <p className="mt-1 text-[12px] text-slate-500">dados em tempo real</p>
         </div>
@@ -298,7 +298,7 @@ export default function Home() {
         {error && <div className="mb-4 rounded-2xl border border-red-400/15 bg-red-400/[0.06] px-4 py-3 text-[14px] text-red-200">{error}</div>}
 
         {/* ─── Score / Radar Section (v2 — refined frame) ─── */}
-        <section className="relative mb-6 overflow-hidden rounded-[28px] border border-cyan-400/[0.12] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] px-5 py-7 shadow-[0_0_50px_rgba(45,204,255,0.06)]">
+        <section className="relative mb-8 overflow-hidden rounded-[28px] border border-cyan-400/[0.12] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] px-5 py-8 shadow-[0_0_50px_rgba(45,204,255,0.06)]">
           {/* double border glow */}
           <div className="pointer-events-none absolute inset-0 rounded-[28px] border border-cyan-400/[0.06]" style={{ margin: "3px" }} />
           {/* radial glow */}
@@ -342,7 +342,7 @@ export default function Home() {
         </section>
 
         {/* ─── Metric Cards v2 (with glow borders) ─── */}
-        <section className="mb-6 grid grid-cols-4 gap-2.5">
+        <section className="mb-8 grid grid-cols-4 gap-3">
           {metrics.map((m) => (
             <MetricCard
               key={m.title}
@@ -357,8 +357,8 @@ export default function Home() {
         </section>
 
         {/* ─── Hourly Forecast v2 (mini cards, horizontal scroll) ─── */}
-        <section className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
+        <section className="mb-8">
+          <div className="mb-4 flex items-center justify-between">
             <h3 className="text-[20px] font-bold tracking-tight">Previsão por hora</h3>
             <div className="flex items-center gap-3 text-[11px]">
               <span className="flex items-center gap-1 text-slate-500"><span className="h-[8px] w-[8px] rounded-full bg-[#2dffb3]" />Seguro</span>
@@ -368,7 +368,7 @@ export default function Home() {
           </div>
 
           {/* scrollable mini cards */}
-          <div className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
+          <div className="no-scrollbar -mx-5 flex gap-3 overflow-x-auto px-5 pb-2">
             {hourly.map((h) => (
               <HourlyCard key={h.time} item={h} />
             ))}
@@ -376,7 +376,7 @@ export default function Home() {
 
           {/* best window */}
           {bestWindow && (
-            <div className="mt-3 rounded-2xl border border-cyan-400/[0.1] bg-cyan-400/[0.04] px-4 py-3 text-center">
+            <div className="mt-4 rounded-2xl border border-cyan-400/[0.1] bg-cyan-400/[0.04] px-4 py-3.5 text-center">
               <p className="inline-flex items-center gap-2 text-[13px] text-cyan-300">
                 <LocateFixed size={13} />
                 Próxima janela recomendada entre <span className="font-semibold">{bestWindow}</span>
@@ -385,9 +385,12 @@ export default function Home() {
           )}
         </section>
 
+        {/* spacer to push CTA down */}
+        <div className="flex-1 min-h-[20px]" />
+
         {/* ─── CTA Button ─── */}
         <a href="/analise"
-          className="mb-2 block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
+          className="mb-4 block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
           Ver análise detalhada
         </a>
 
