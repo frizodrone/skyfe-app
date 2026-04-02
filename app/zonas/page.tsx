@@ -1,496 +1,781 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
-  ArrowLeft,
-  Wind,
-  Zap,
-  CloudRain,
-  Thermometer,
-  Sun,
-  Clock3,
-  Map,
-  User,
-  ChevronDown,
+  Sun, Clock3, Map, User, Layers, Plane, AlertTriangle,
+  ChevronDown, ChevronUp, X, LocateFixed, Minus, Plus,
 } from "lucide-react";
 import Link from "next/link";
-import { calculateFlightScore } from "@/lib/score";
 
-type Level = "good" | "warn" | "risk";
-
-const LC: Record<Level, string> = {
-  good: "#2dffb3",
-  warn: "#ffd84d",
-  risk: "#ff5a5f",
+/* ═══════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════ */
+type Airport = {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  type: string;
+  iata: string;
+  icao: string;
+  elevation: number;
+  runways: Runway[];
 };
 
-type HourItem = {
-  time: string;
-  hour: string;
-  score: number;
-  level: Level;
-  wind: number;
-  gust: number;
-  rainP: number;
-  temp: number;
+type Runway = {
+  length_m: number;
+  width_m: number;
+  surface: string;
+  le_ident: string;
+  he_ident: string;
+  le_heading: number;
+  he_heading: number;
+  le_lat: number;
+  le_lon: number;
+  he_lat: number;
+  he_lon: number;
 };
 
-type DayItem = {
-  date: string;
-  dayLabel: string;
-  avgScore: number;
-  level: Level;
-  minTemp: number;
-  maxTemp: number;
-  maxWind: number;
-  maxGust: number;
-  maxRain: number;
-  hours: HourItem[];
+type AirspaceZone = {
+  id: string;
+  name: string;
+  type: string;
+  lowerLimit: number;
+  upperLimit: number;
+  center: [number, number];
+  radius_km: number;
 };
 
-export default function Previsao() {
-  const [loading, setLoading] = useState(true);
-  const [weather, setWeather] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"hours" | "days">("hours");
-  const [expandedDay, setExpandedDay] = useState<string | null>(null);
+type MapStyle = "dark" | "satellite";
 
-  const load = useCallback(async (lat: number, lon: number) => {
-    try {
-      const params = [
-        `latitude=${lat}`,
-        `longitude=${lon}`,
-        `hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability`,
-        `daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_gusts_10m_max,precipitation_probability_max`,
-        `forecast_days=16`,
-        `timezone=auto`,
-      ].join("&");
+/* ═══════════════════════════════════════════════════════════
+   CONSTANTS
+   ═══════════════════════════════════════════════════════════ */
+const TILE_URLS: Record<MapStyle, string> = {
+  dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  satellite: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+};
 
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
-      const data = await res.json();
-      setWeather(data);
-    } catch {
-      // pode adicionar tratamento depois
-    }
-    setLoading(false);
-  }, []);
+const TILE_ATTR: Record<MapStyle, string> = {
+  dark: '&copy; <a href="https://carto.com/">CARTO</a>',
+  satellite: '&copy; <a href="https://www.esri.com/">Esri</a>',
+};
 
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      load(-23.55, -46.63);
-      return;
-    }
+const AIRPORT_COLORS: Record<string, string> = {
+  large_airport: "#ff5a5f",
+  medium_airport: "#ffd84d",
+  small_airport: "#2dffb3",
+  heliport: "#c084fc",
+  seaplane_base: "#38bdf8",
+};
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => load(pos.coords.latitude, pos.coords.longitude),
-      () => load(-23.55, -46.63),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
-  }, [load]);
+const AIRPORT_LABELS: Record<string, string> = {
+  large_airport: "Grande porte",
+  medium_airport: "Médio porte",
+  small_airport: "Pequeno porte",
+  heliport: "Heliponto",
+  seaplane_base: "Hidroavião",
+};
 
-  const hourlyItems: HourItem[] = useMemo(() => {
-    if (!weather?.hourly?.time) return [];
+const AIRSPACE_BORDERS: Record<string, string> = {
+  CTR: "#ff5a5f",
+  TMA: "#ffd84d",
+};
 
-    const now = new Date();
-    const items: HourItem[] = [];
+/* ═══════════════════════════════════════════════════════════
+   CSV PARSER
+   ═══════════════════════════════════════════════════════════ */
+function parseCSV(csv: string): Record<string, string>[] {
+  const lines = csv.trim().split("\n");
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map((h) => h.replace(/"/g, "").trim());
+  const rows: Record<string, string>[] = [];
 
-    for (let i = 0; i < weather.hourly.time.length && items.length < 24; i++) {
-      const t = new Date(weather.hourly.time[i]);
-      if (t < now) continue;
+  for (let i = 1; i < lines.length; i++) {
+    const values: string[] = [];
+    let current = "";
+    let inQuotes = false;
 
-      const wind = weather.hourly.wind_speed_10m?.[i] ?? 0;
-      const gust = weather.hourly.wind_gusts_10m?.[i] ?? 0;
-      const rainP = weather.hourly.precipitation_probability?.[i] ?? 0;
-      const temp = weather.hourly.temperature_2m?.[i] ?? 20;
-
-      const res = calculateFlightScore({
-        wind,
-        gust,
-        rainProb: rainP,
-        temp,
-      });
-
-      items.push({
-        time: weather.hourly.time[i],
-        hour: t.toLocaleTimeString("pt-BR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        score: res.score,
-        level: res.level,
-        wind: Math.round(wind),
-        gust: Math.round(gust),
-        rainP: Math.round(rainP),
-        temp: Math.round(temp),
-      });
-    }
-
-    return items;
-  }, [weather]);
-
-  const dailyItems: DayItem[] = useMemo(() => {
-    if (!weather?.daily?.time) return [];
-
-    const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-    const monthNames = [
-      "jan",
-      "fev",
-      "mar",
-      "abr",
-      "mai",
-      "jun",
-      "jul",
-      "ago",
-      "set",
-      "out",
-      "nov",
-      "dez",
-    ];
-
-    return weather.daily.time.map((dateStr: string, i: number) => {
-      const d = new Date(`${dateStr}T12:00:00`);
-      const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const isToday = d.toDateString() === today.toDateString();
-      const isTomorrow = d.toDateString() === tomorrow.toDateString();
-
-      const dayLabel = isToday
-        ? "Hoje"
-        : isTomorrow
-          ? "Amanhã"
-          : `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
-
-      const maxW = weather.daily.wind_speed_10m_max?.[i] ?? 0;
-      const maxG = weather.daily.wind_gusts_10m_max?.[i] ?? 0;
-      const maxR = weather.daily.precipitation_probability_max?.[i] ?? 0;
-      const minT = Math.round(weather.daily.temperature_2m_min?.[i] ?? 0);
-      const maxT = Math.round(weather.daily.temperature_2m_max?.[i] ?? 0);
-      const avgT = (minT + maxT) / 2;
-
-      const res = calculateFlightScore({
-        wind: maxW,
-        gust: maxG,
-        rainProb: maxR,
-        temp: avgT,
-      });
-
-      const dayHours: HourItem[] = [];
-
-      if (weather.hourly?.time) {
-        for (let h = 0; h < weather.hourly.time.length; h++) {
-          if (weather.hourly.time[h].startsWith(dateStr)) {
-            const t = new Date(weather.hourly.time[h]);
-            const hw = weather.hourly.wind_speed_10m?.[h] ?? 0;
-            const hg = weather.hourly.wind_gusts_10m?.[h] ?? 0;
-            const hr = weather.hourly.precipitation_probability?.[h] ?? 0;
-            const ht = weather.hourly.temperature_2m?.[h] ?? 20;
-
-            const hres = calculateFlightScore({
-              wind: hw,
-              gust: hg,
-              rainProb: hr,
-              temp: ht,
-            });
-
-            dayHours.push({
-              time: weather.hourly.time[h],
-              hour: t.toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              score: hres.score,
-              level: hres.level,
-              wind: Math.round(hw),
-              gust: Math.round(hg),
-              rainP: Math.round(hr),
-              temp: Math.round(ht),
-            });
-          }
-        }
+    for (let j = 0; j < lines[i].length; j++) {
+      const ch = lines[i][j];
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+      } else if (ch === "," && !inQuotes) {
+        values.push(current.trim());
+        current = "";
+      } else {
+        current += ch;
       }
+    }
+    values.push(current.trim());
 
-      return {
-        date: dateStr,
-        dayLabel,
-        avgScore: res.score,
-        level: res.level,
-        minTemp: minT,
-        maxTemp: maxT,
-        maxWind: Math.round(maxW),
-        maxGust: Math.round(maxG),
-        maxRain: Math.round(maxR),
-        hours: dayHours,
-      };
+    const row: Record<string, string> = {};
+    headers.forEach((h, idx) => {
+      row[h] = values[idx] || "";
     });
-  }, [weather]);
+    rows.push(row);
+  }
+  return rows;
+}
 
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 rounded-full border-[3px] border-white/[0.06] border-t-cyan-400 animate-spin-loader" />
-          <p className="text-[15px] text-slate-400">Carregando previsão...</p>
+/* ═══════════════════════════════════════════════════════════
+   HAVERSINE
+   ═══════════════════════════════════════════════════════════ */
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FETCH AIRPORTS — different radius per type
+   ═══════════════════════════════════════════════════════════ */
+const AIRPORTS_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv";
+const RUNWAYS_URL = "https://davidmegginson.github.io/ourairports-data/runways.csv";
+
+const RADIUS_BY_TYPE: Record<string, number> = {
+  large_airport: 150,
+  medium_airport: 80,
+  small_airport: 50,
+  heliport: 15,
+  seaplane_base: 50,
+};
+
+async function fetchAirportsNear(lat: number, lon: number): Promise<Airport[]> {
+  try {
+    const res = await fetch(AIRPORTS_URL);
+    const csv = await res.text();
+    const allRows = parseCSV(csv);
+
+    const types = Object.keys(RADIUS_BY_TYPE);
+    const nearby: Airport[] = [];
+
+    for (const row of allRows) {
+      if (!types.includes(row.type)) continue;
+      const rlat = parseFloat(row.latitude_deg);
+      const rlon = parseFloat(row.longitude_deg);
+      if (isNaN(rlat) || isNaN(rlon)) continue;
+
+      const maxDist = RADIUS_BY_TYPE[row.type] || 50;
+      const dist = haversine(lat, lon, rlat, rlon);
+      if (dist <= maxDist) {
+        nearby.push({
+          id: row.id || `${rlat}-${rlon}`,
+          name: row.name || "Sem nome",
+          lat: rlat,
+          lon: rlon,
+          type: row.type,
+          iata: row.iata_code || "",
+          icao: row.ident || "",
+          elevation: parseFloat(row.elevation_ft) || 0,
+          runways: [],
+        });
+      }
+    }
+
+    // Fetch runways
+    try {
+      const rRes = await fetch(RUNWAYS_URL);
+      const rCsv = await rRes.text();
+      const rRows = parseCSV(rCsv);
+      const airportIds = new Set(nearby.map((a) => a.id));
+
+      for (const rr of rRows) {
+        if (!airportIds.has(rr.airport_ref)) continue;
+        const ap = nearby.find((a) => a.id === rr.airport_ref);
+        if (!ap) continue;
+
+        ap.runways.push({
+          length_m: Math.round((parseFloat(rr.length_ft) || 0) * 0.3048),
+          width_m: Math.round((parseFloat(rr.width_ft) || 0) * 0.3048),
+          surface: rr.surface || "Desconhecido",
+          le_ident: rr.le_ident || "",
+          he_ident: rr.he_ident || "",
+          le_heading: parseFloat(rr.le_heading_degT) || 0,
+          he_heading: parseFloat(rr.he_heading_degT) || 0,
+          le_lat: parseFloat(rr.le_latitude_deg) || 0,
+          le_lon: parseFloat(rr.le_longitude_deg) || 0,
+          he_lat: parseFloat(rr.he_latitude_deg) || 0,
+          he_lon: parseFloat(rr.he_longitude_deg) || 0,
+        });
+      }
+    } catch {
+      // runways optional
+    }
+
+    return nearby;
+  } catch {
+    return [];
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GENERATE AIRSPACE ZONES
+   ═══════════════════════════════════════════════════════════ */
+function generateAirspaces(airports: Airport[]): AirspaceZone[] {
+  const zones: AirspaceZone[] = [];
+  for (const ap of airports) {
+    if (ap.type === "large_airport") {
+      zones.push({
+        id: `ctr-${ap.id}`, name: `CTR ${ap.icao}`, type: "CTR",
+        lowerLimit: 0, upperLimit: 3500, center: [ap.lat, ap.lon], radius_km: 10,
+      });
+      zones.push({
+        id: `tma-${ap.id}`, name: `TMA ${ap.icao}`, type: "TMA",
+        lowerLimit: 0, upperLimit: 14500, center: [ap.lat, ap.lon], radius_km: 25,
+      });
+    } else if (ap.type === "medium_airport") {
+      zones.push({
+        id: `ctr-${ap.id}`, name: `CTR ${ap.icao}`, type: "CTR",
+        lowerLimit: 0, upperLimit: 2500, center: [ap.lat, ap.lon], radius_km: 5,
+      });
+    }
+  }
+  return zones;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ICON BUILDERS — different per type
+   ═══════════════════════════════════════════════════════════ */
+function buildAirportIcon(L: any, ap: Airport) {
+  const color = AIRPORT_COLORS[ap.type] || "#2dccff";
+
+  if (ap.type === "large_airport") {
+    // Big icon with airplane SVG + label always visible
+    const label = ap.iata || ap.icao;
+    return L.divIcon({
+      html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:auto;cursor:pointer;">
+        <div style="width:36px;height:36px;border-radius:12px;background:${color};display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px ${color}88,0 2px 8px rgba(0,0,0,0.4);border:2px solid rgba(255,255,255,0.3);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+          </svg>
         </div>
-      </main>
-    );
+        <div style="background:rgba(0,0,0,0.85);padding:2px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);white-space:nowrap;">
+          <span style="font-size:11px;font-weight:800;color:#fff;letter-spacing:0.5px;">${label}</span>
+        </div>
+      </div>`,
+      className: "",
+      iconSize: [50, 56],
+      iconAnchor: [25, 28],
+    });
   }
 
+  if (ap.type === "medium_airport") {
+    const label = ap.iata || ap.icao;
+    return L.divIcon({
+      html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:auto;cursor:pointer;">
+        <div style="width:26px;height:26px;border-radius:8px;background:${color};display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px ${color}66;border:2px solid rgba(255,255,255,0.25);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+          </svg>
+        </div>
+        <div style="background:rgba(0,0,0,0.8);padding:1px 6px;border-radius:4px;white-space:nowrap;">
+          <span style="font-size:9px;font-weight:700;color:${color};letter-spacing:0.3px;">${label}</span>
+        </div>
+      </div>`,
+      className: "",
+      iconSize: [40, 44],
+      iconAnchor: [20, 22],
+    });
+  }
+
+  if (ap.type === "small_airport") {
+    return L.divIcon({
+      html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};box-shadow:0 0 10px ${color}55;border:2px solid rgba(255,255,255,0.2);cursor:pointer;pointer-events:auto;"></div>`,
+      className: "",
+      iconSize: [12, 12],
+      iconAnchor: [6, 6],
+    });
+  }
+
+  if (ap.type === "heliport") {
+    return L.divIcon({
+      html: `<div style="width:18px;height:18px;border-radius:5px;background:rgba(192,132,252,0.2);display:flex;align-items:center;justify-content:center;border:1.5px solid ${color};cursor:pointer;pointer-events:auto;">
+        <span style="font-size:10px;font-weight:900;color:${color};line-height:1;">H</span>
+      </div>`,
+      className: "",
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
+  }
+
+  // seaplane_base / default
+  return L.divIcon({
+    html: `<div style="width:10px;height:10px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color}44;border:1.5px solid rgba(255,255,255,0.2);cursor:pointer;pointer-events:auto;"></div>`,
+    className: "",
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AIRPORT DETAIL PANEL
+   ═══════════════════════════════════════════════════════════ */
+function AirportDetail({ airport, userPos, onClose }: { airport: Airport; userPos: [number, number]; onClose: () => void }) {
+  const color = AIRPORT_COLORS[airport.type] || "#2dccff";
+  const typeLabel = AIRPORT_LABELS[airport.type] || airport.type;
+  const dist = haversine(userPos[0], userPos[1], airport.lat, airport.lon);
+
   return (
-    <main className="min-h-screen bg-[#04090f] text-white">
-      <div className="pointer-events-none fixed inset-0 opacity-80">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_34%)]" />
+    <div className="absolute bottom-20 left-3 right-3 z-[1000] max-h-[55vh] overflow-y-auto rounded-[20px] border border-white/[0.08] bg-[#0a1222]/95 backdrop-blur-xl shadow-[0_-8px_40px_rgba(0,0,0,0.5)] no-scrollbar">
+      <div className="sticky top-0 z-10 flex items-start justify-between rounded-t-[20px] bg-[#0a1222]/95 px-5 pt-5 pb-3 backdrop-blur-xl">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider"
+              style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}>
+              {airport.type === "heliport" ? "H" : <Plane size={10} />}
+              {typeLabel}
+            </span>
+            {airport.icao && (
+              <span className="text-[13px] font-mono font-bold text-cyan-400">{airport.icao}</span>
+            )}
+            {airport.iata && (
+              <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[11px] font-mono font-bold text-white">{airport.iata}</span>
+            )}
+          </div>
+          <h3 className="text-[17px] font-bold text-white leading-tight">{airport.name}</h3>
+          <div className="mt-1.5 flex items-center gap-3 text-[12px] text-slate-500">
+            <span>Elevação: {airport.elevation} ft</span>
+            <span>•</span>
+            <span className="text-cyan-400 font-medium">{dist.toFixed(1)} km de você</span>
+          </div>
+        </div>
+        <button onClick={onClose}
+          className="ml-3 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-400 transition hover:bg-white/[0.08]">
+          <X size={15} />
+        </button>
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-md px-5 pb-28 pt-6">
-        <header className="mb-8 flex items-center gap-4">
-          <Link
-            href="/"
-            className="grid h-11 w-11 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]"
-          >
-            <ArrowLeft size={18} />
-          </Link>
-          <h1 className="text-[24px] font-bold tracking-tight">Previsão completa</h1>
-        </header>
-
-        <div className="mb-8 flex gap-3">
-          <button
-            onClick={() => setActiveTab("hours")}
-            className="flex-1 rounded-2xl py-3.5 text-[15px] font-semibold transition-all duration-200"
-            style={
-              activeTab === "hours"
-                ? {
-                    background:
-                      "linear-gradient(135deg, rgba(45,204,255,0.15) 0%, rgba(45,255,179,0.1) 100%)",
-                    border: "1px solid rgba(45,204,255,0.3)",
-                    color: "#2dccff",
-                    boxShadow: "0 0 20px rgba(45,204,255,0.1)",
-                  }
-                : {
-                    background: "rgba(255,255,255,0.025)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    color: "#64748b",
-                  }
-            }
-          >
-            Próximas 24h
-          </button>
-
-          <button
-            onClick={() => setActiveTab("days")}
-            className="flex-1 rounded-2xl py-3.5 text-[15px] font-semibold transition-all duration-200"
-            style={
-              activeTab === "days"
-                ? {
-                    background:
-                      "linear-gradient(135deg, rgba(45,204,255,0.15) 0%, rgba(45,255,179,0.1) 100%)",
-                    border: "1px solid rgba(45,204,255,0.3)",
-                    color: "#2dccff",
-                    boxShadow: "0 0 20px rgba(45,204,255,0.1)",
-                  }
-                : {
-                    background: "rgba(255,255,255,0.025)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    color: "#64748b",
-                  }
-            }
-          >
-            16 dias
-          </button>
-        </div>
-
-        <div className="mb-8 flex items-center gap-4 text-[12px]">
-          <span className="flex items-center gap-1.5 text-slate-500">
-            <span className="h-[9px] w-[9px] rounded-full bg-[#2dffb3]" /> Seguro
-          </span>
-          <span className="flex items-center gap-1.5 text-slate-500">
-            <span className="h-[9px] w-[9px] rounded-full bg-[#ffd84d]" /> Cuidado
-          </span>
-          <span className="flex items-center gap-1.5 text-slate-500">
-            <span className="h-[9px] w-[9px] rounded-full bg-[#ff5a5f]" /> Risco
-          </span>
-        </div>
-
-        {activeTab === "hours" && (
-          <div className="flex flex-col gap-3">
-            {hourlyItems.map((h) => (
-              <div
-                key={h.time}
-                className="relative flex items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4 transition-all duration-200"
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)",
-                  border: `1px solid ${LC[h.level]}18`,
-                  boxShadow: `0 0 12px ${LC[h.level]}06`,
-                }}
-              >
-                <div
-                  className="absolute bottom-2 left-0 top-2 w-[3px] rounded-full"
-                  style={{ background: LC[h.level], opacity: 0.6 }}
-                />
-
-                <div
-                  className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
-                  style={{
-                    background: `${LC[h.level]}10`,
-                    border: `1px solid ${LC[h.level]}20`,
-                  }}
-                >
-                  <span className="text-[16px] font-bold" style={{ color: LC[h.level] }}>
-                    {h.score}
+      {airport.runways.length > 0 ? (
+        <div className="px-5 pb-5">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Pistas ({airport.runways.length})
+          </p>
+          <div className="flex flex-col gap-2.5">
+            {airport.runways.map((rw, i) => (
+              <div key={i} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[17px] font-bold text-cyan-400">
+                    {rw.le_ident} / {rw.he_ident}
                   </span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 bg-white/[0.04] px-2 py-1 rounded-md">Cabeceiras</span>
                 </div>
-
-                <div className="flex-1">
-                  <p className="text-[16px] font-semibold text-slate-100">{h.hour}</p>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-500">
-                    <span className="inline-flex items-center gap-1">
-                      <Wind size={11} />
-                      {h.wind} km/h
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Zap size={11} />
-                      {h.gust}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <CloudRain size={11} />
-                      {h.rainP}%
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Thermometer size={11} />
-                      {h.temp}°
-                    </span>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p className="text-[20px] font-bold text-white">{rw.length_m}<span className="text-[11px] text-slate-500 font-normal">m</span></p>
+                    <p className="text-[10px] text-slate-500">Comprimento</p>
+                  </div>
+                  <div>
+                    <p className="text-[20px] font-bold text-white">{rw.width_m}<span className="text-[11px] text-slate-500 font-normal">m</span></p>
+                    <p className="text-[10px] text-slate-500">Largura</p>
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-semibold text-white capitalize leading-tight mt-1">{rw.surface.toLowerCase()}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Superfície</p>
                   </div>
                 </div>
-
-                <span
-                  className="h-[12px] w-[12px] shrink-0 rounded-full"
-                  style={{
-                    background: LC[h.level],
-                    boxShadow: `0 0 10px ${LC[h.level]}44`,
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {activeTab === "days" && (
-          <div className="flex flex-col gap-3">
-            {dailyItems.map((day) => (
-              <div key={day.date}>
-                <button
-                  onClick={() =>
-                    setExpandedDay(expandedDay === day.date ? null : day.date)
-                  }
-                  className="relative flex w-full items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4 text-left transition-all duration-200"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)",
-                    border: `1px solid ${LC[day.level]}18`,
-                    boxShadow: `0 0 12px ${LC[day.level]}06`,
-                  }}
-                >
-                  <div
-                    className="absolute bottom-2 left-0 top-2 w-[3px] rounded-full"
-                    style={{ background: LC[day.level], opacity: 0.6 }}
-                  />
-
-                  <div
-                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
-                    style={{
-                      background: `${LC[day.level]}10`,
-                      border: `1px solid ${LC[day.level]}20`,
-                    }}
-                  >
-                    <span className="text-[16px] font-bold" style={{ color: LC[day.level] }}>
-                      {day.avgScore}
-                    </span>
-                  </div>
-
-                  <div className="flex-1">
-                    <p className="text-[16px] font-semibold text-slate-100">
-                      {day.dayLabel}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-500">
-                      <span>
-                        {day.minTemp}°–{day.maxTemp}°
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Wind size={11} />
-                        {day.maxWind}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <CloudRain size={11} />
-                        {day.maxRain}%
-                      </span>
-                    </div>
-                  </div>
-
-                  <ChevronDown
-                    size={18}
-                    className={`shrink-0 text-slate-500 transition-transform duration-200 ${
-                      expandedDay === day.date ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                {expandedDay === day.date && day.hours.length > 0 && (
-                  <div className="ml-2 mr-2 mt-2 rounded-2xl border border-white/[0.04] bg-white/[0.02] p-3">
-                    <div className="flex flex-col gap-2">
-                      {day.hours.map((h) => (
-                        <div
-                          key={h.time}
-                          className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-                          style={{ background: `${LC[h.level]}06` }}
-                        >
-                          <span
-                            className="h-[9px] w-[9px] shrink-0 rounded-full"
-                            style={{ background: LC[h.level] }}
-                          />
-                          <span className="w-[50px] text-[13px] font-medium text-slate-200">
-                            {h.hour}
-                          </span>
-                          <span
-                            className="w-[32px] text-[14px] font-bold"
-                            style={{ color: LC[h.level] }}
-                          >
-                            {h.score}
-                          </span>
-                          <span className="flex-1 text-[11px] text-slate-500">
-                            {h.wind}km/h · {h.rainP}% · {h.temp}°
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                {(rw.le_heading > 0 || rw.he_heading > 0) && (
+                  <div className="mt-3 flex items-center justify-center gap-4 rounded-xl bg-white/[0.03] py-2 text-[12px]">
+                    <span className="text-slate-300"><span className="text-cyan-400 font-semibold">{rw.le_ident}</span> → {Math.round(rw.le_heading)}°</span>
+                    <span className="text-slate-600">|</span>
+                    <span className="text-slate-300"><span className="text-cyan-400 font-semibold">{rw.he_ident}</span> → {Math.round(rw.he_heading)}°</span>
                   </div>
                 )}
               </div>
             ))}
           </div>
-        )}
+        </div>
+      ) : (
+        <div className="px-5 pb-5">
+          <p className="text-[13px] text-slate-500 italic">Sem dados de pistas disponíveis para este local.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LEGEND
+   ═══════════════════════════════════════════════════════════ */
+function Legend({ show, onToggle }: { show: boolean; onToggle: () => void }) {
+  return (
+    <div className="relative">
+      <button onClick={onToggle}
+        className="flex items-center gap-2 rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 px-3 py-2 text-[11px] font-medium text-slate-300 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]">
+        <AlertTriangle size={12} className="text-amber-400" />
+        Legenda
+        {show ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+      </button>
+
+      {show && (
+        <div className="absolute right-0 mt-2 w-[220px] rounded-2xl border border-white/[0.08] bg-[#0a1222]/95 p-4 shadow-xl backdrop-blur-xl">
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Aeroportos</p>
+          <div className="mb-4 flex flex-col gap-2.5">
+            {[
+              { type: "large_airport", icon: "✈️", label: "Grande porte (GRU, CGH...)" },
+              { type: "medium_airport", icon: "✈", label: "Médio porte" },
+              { type: "small_airport", icon: "●", label: "Pequeno porte" },
+              { type: "heliport", icon: "H", label: "Heliponto" },
+            ].map((item) => (
+              <div key={item.type} className="flex items-center gap-2.5 text-[12px] text-slate-300">
+                <span className="flex h-5 w-5 items-center justify-center rounded text-[10px]" style={{ color: AIRPORT_COLORS[item.type], background: `${AIRPORT_COLORS[item.type]}15` }}>
+                  {item.icon}
+                </span>
+                {item.label}
+              </div>
+            ))}
+          </div>
+
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Espaço aéreo</p>
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center gap-2.5 text-[12px] text-slate-300">
+              <span className="h-4 w-4 rounded-full shrink-0 border-2" style={{ borderColor: "#ff5a5f", background: "rgba(255,90,95,0.15)" }} />
+              CTR — Zona de controle
+            </div>
+            <div className="flex items-center gap-2.5 text-[12px] text-slate-300">
+              <span className="h-4 w-4 rounded-full shrink-0 border-2 border-dashed" style={{ borderColor: "#ffd84d", background: "rgba(255,216,77,0.1)" }} />
+              TMA — Área terminal
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl bg-red-500/[0.08] border border-red-500/20 px-3 py-2.5">
+            <p className="text-[11px] leading-relaxed text-red-300/80">
+              ⚠️ Zonas CTR e TMA exigem autorização DECEA/SARPAS para voo com drones.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAP COMPONENT
+   ═══════════════════════════════════════════════════════════ */
+function ZonasMap() {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const leafletMap = useRef<any>(null);
+  const tileLayerRef = useRef<any>(null);
+  const layerGroupRef = useRef<any>(null);
+  const heliLayerRef = useRef<any>(null);
+  const LRef = useRef<any>(null);
+
+  const [mapStyle, setMapStyle] = useState<MapStyle>("dark");
+  const [loading, setLoading] = useState(true);
+  const [airports, setAirports] = useState<Airport[]>([]);
+  const [airspaces, setAirspaces] = useState<AirspaceZone[]>([]);
+  const [selectedAirport, setSelectedAirport] = useState<Airport | null>(null);
+  const [showLegend, setShowLegend] = useState(false);
+  const [userPos, setUserPos] = useState<[number, number]>([-23.55, -46.63]);
+  const [loadingAirports, setLoadingAirports] = useState(false);
+  const [stats, setStats] = useState({ airports: 0, heliports: 0 });
+
+  // Init map
+  useEffect(() => {
+    let mounted = true;
+
+    const init = async () => {
+      if (typeof window === "undefined") return;
+
+      if (!document.getElementById("leaflet-css")) {
+        const link = document.createElement("link");
+        link.id = "leaflet-css";
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+      }
+
+      const L = (await import("leaflet")).default;
+      if (!mounted) return;
+      LRef.current = L;
+
+      if (!mapRef.current || leafletMap.current) return;
+
+      const map = L.map(mapRef.current, {
+        center: [-23.55, -46.63],
+        zoom: 11,
+        zoomControl: false,
+        attributionControl: true,
+      });
+
+      tileLayerRef.current = L.tileLayer(TILE_URLS.dark, {
+        attribution: TILE_ATTR.dark,
+        maxZoom: 18,
+      }).addTo(map);
+
+      layerGroupRef.current = L.layerGroup().addTo(map);
+      heliLayerRef.current = L.layerGroup().addTo(map);
+
+      leafletMap.current = map;
+      setLoading(false);
+
+      // Show/hide heliports based on zoom
+      map.on("zoomend", () => {
+        const z = map.getZoom();
+        if (z >= 12 && !map.hasLayer(heliLayerRef.current)) {
+          map.addLayer(heliLayerRef.current);
+        } else if (z < 12 && map.hasLayer(heliLayerRef.current)) {
+          map.removeLayer(heliLayerRef.current);
+        }
+      });
+
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => {
+          if (!mounted) return;
+          const latlng: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+          setUserPos(latlng);
+          map.setView(latlng, 11);
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    };
+
+    init();
+
+    return () => {
+      mounted = false;
+      if (leafletMap.current) {
+        leafletMap.current.remove();
+        leafletMap.current = null;
+      }
+    };
+  }, []);
+
+  // Fetch airports
+  useEffect(() => {
+    setLoadingAirports(true);
+    fetchAirportsNear(userPos[0], userPos[1]).then((aps) => {
+      setAirports(aps);
+      setAirspaces(generateAirspaces(aps));
+      const heliCount = aps.filter((a) => a.type === "heliport").length;
+      setStats({ airports: aps.length - heliCount, heliports: heliCount });
+      setLoadingAirports(false);
+    });
+  }, [userPos]);
+
+  // Draw on map
+  useEffect(() => {
+    const L = LRef.current;
+    const map = leafletMap.current;
+    if (!L || !map || !layerGroupRef.current || !heliLayerRef.current) return;
+
+    layerGroupRef.current.clearLayers();
+    heliLayerRef.current.clearLayers();
+
+    // Draw airspaces
+    for (const zone of airspaces) {
+      const circle = L.circle(zone.center, {
+        radius: zone.radius_km * 1000,
+        color: AIRSPACE_BORDERS[zone.type] || "#ff5a5f",
+        weight: zone.type === "TMA" ? 1.5 : 2,
+        opacity: 0.6,
+        fillColor: AIRSPACE_BORDERS[zone.type] || "#ff5a5f",
+        fillOpacity: zone.type === "TMA" ? 0.06 : 0.1,
+        dashArray: zone.type === "TMA" ? "10,8" : undefined,
+      });
+
+      circle.bindTooltip(
+        `<div style="font-size:11px;font-weight:600;">${zone.name}</div><div style="font-size:10px;color:#999;">${zone.type} • ${zone.lowerLimit}–${zone.upperLimit} ft</div>`,
+        { direction: "top" }
+      );
+
+      layerGroupRef.current.addLayer(circle);
+    }
+
+    // Draw airports (sorted: large first to be on top)
+    const sorted = [...airports].sort((a, b) => {
+      const order: Record<string, number> = { heliport: 0, seaplane_base: 1, small_airport: 2, medium_airport: 3, large_airport: 4 };
+      return (order[a.type] || 0) - (order[b.type] || 0);
+    });
+
+    for (const ap of sorted) {
+      const icon = buildAirportIcon(L, ap);
+      const marker = L.marker([ap.lat, ap.lon], { icon });
+
+      if (ap.type !== "large_airport") {
+        marker.bindTooltip(
+          `<div style="font-size:12px;font-weight:700;">${ap.icao || ap.name}</div><div style="font-size:10px;color:#999;">${AIRPORT_LABELS[ap.type]}</div>`,
+          { direction: "top", offset: [0, -8] }
+        );
+      }
+
+      marker.on("click", () => setSelectedAirport(ap));
+
+      // Heliports go to separate layer (hidden at low zoom)
+      if (ap.type === "heliport") {
+        heliLayerRef.current.addLayer(marker);
+      } else {
+        layerGroupRef.current.addLayer(marker);
+      }
+
+      // Draw runways
+      for (const rw of ap.runways) {
+        if (rw.le_lat && rw.le_lon && rw.he_lat && rw.he_lon) {
+          const line = L.polyline(
+            [[rw.le_lat, rw.le_lon], [rw.he_lat, rw.he_lon]],
+            { color: "#ffffff", weight: 3, opacity: 0.65 }
+          );
+          layerGroupRef.current.addLayer(line);
+
+          const mkThreshold = (ident: string, lat: number, lon: number) => {
+            if (!lat || !lon) return;
+            const ic = L.divIcon({
+              html: `<div style="font-size:9px;font-weight:700;color:#fff;background:rgba(0,0,0,0.75);padding:1px 5px;border-radius:4px;white-space:nowrap;border:1px solid rgba(255,255,255,0.2);">${ident}</div>`,
+              className: "",
+              iconAnchor: [14, 14],
+            });
+            const m = L.marker([lat, lon], { icon: ic, interactive: false });
+            layerGroupRef.current.addLayer(m);
+          };
+
+          mkThreshold(rw.le_ident, rw.le_lat, rw.le_lon);
+          mkThreshold(rw.he_ident, rw.he_lat, rw.he_lon);
+        }
+      }
+    }
+
+    // User position
+    const userIcon = L.divIcon({
+      html: `<div style="position:relative;width:20px;height:20px;">
+        <div style="position:absolute;inset:0;border-radius:50%;background:rgba(45,204,255,0.2);animation:pulse 2s ease-in-out infinite;"></div>
+        <div style="position:absolute;inset:4px;border-radius:50%;background:#2dccff;border:3px solid #fff;box-shadow:0 0 16px rgba(45,204,255,0.6);"></div>
+      </div>`,
+      className: "",
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+    });
+
+    const userMarker = L.marker(userPos, { icon: userIcon, zIndexOffset: 1000 });
+    userMarker.bindTooltip("Sua localização", { direction: "top", offset: [0, -12] });
+    layerGroupRef.current.addLayer(userMarker);
+
+    // Check initial zoom for heliports
+    const z = map.getZoom();
+    if (z < 12 && map.hasLayer(heliLayerRef.current)) {
+      map.removeLayer(heliLayerRef.current);
+    }
+  }, [airports, airspaces, userPos]);
+
+  // Switch tiles
+  useEffect(() => {
+    const L = LRef.current;
+    const map = leafletMap.current;
+    if (!L || !map) return;
+
+    if (tileLayerRef.current) tileLayerRef.current.remove();
+    tileLayerRef.current = L.tileLayer(TILE_URLS[mapStyle], {
+      attribution: TILE_ATTR[mapStyle],
+      maxZoom: 18,
+    }).addTo(map);
+
+    // Keep layers on top
+    if (layerGroupRef.current) layerGroupRef.current.bringToFront();
+    if (heliLayerRef.current) heliLayerRef.current.bringToFront();
+  }, [mapStyle]);
+
+  const handleLocate = useCallback(() => {
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => {
+        const latlng: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setUserPos(latlng);
+        leafletMap.current?.setView(latlng, 12, { animate: true });
+      },
+      () => {},
+      { enableHighAccuracy: true }
+    );
+  }, []);
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={mapRef} className="h-full w-full" />
+
+      {/* Loading */}
+      {(loading || loadingAirports) && (
+        <div className="absolute inset-0 z-[999] flex items-center justify-center bg-[#04090f]/80">
+          <div className="text-center">
+            <div className="mx-auto mb-3 h-10 w-10 rounded-full border-[3px] border-white/[0.06] border-t-cyan-400 animate-spin-loader" />
+            <p className="text-[13px] text-slate-400">
+              {loading ? "Carregando mapa..." : "Buscando aeroportos e helipontos..."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Top bar — info + legend side by side */}
+      <div className="absolute top-3 left-3 right-3 z-[1000] flex items-start justify-between">
+        {/* Info bar */}
+        <div className="flex items-center gap-2 rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 px-3 py-2 text-[11px] text-slate-300 shadow-lg backdrop-blur-xl">
+          <Plane size={12} className="text-cyan-400" />
+          <span className="font-bold text-white">{stats.airports}</span>
+          <span className="hidden min-[360px]:inline">aerop.</span>
+          <span className="text-slate-600">•</span>
+          <span className="text-[10px] font-bold text-purple-400">H</span>
+          <span className="font-bold text-white">{stats.heliports}</span>
+          <span className="hidden min-[360px]:inline">helip.</span>
+        </div>
+
+        {/* Legend */}
+        <Legend show={showLegend} onToggle={() => setShowLegend(!showLegend)} />
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">
+      {/* Controls */}
+      <div className="absolute right-3 bottom-24 z-[1000] flex flex-col gap-2">
+        <button onClick={() => setMapStyle(mapStyle === "dark" ? "satellite" : "dark")}
+          className="grid h-11 w-11 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-slate-300 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]"
+          title={mapStyle === "dark" ? "Satélite" : "Escuro"}>
+          <Layers size={17} />
+        </button>
+        <button onClick={handleLocate}
+          className="grid h-11 w-11 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-cyan-400 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]"
+          title="Minha localização">
+          <LocateFixed size={17} />
+        </button>
+        <button onClick={() => leafletMap.current?.zoomIn()}
+          className="grid h-11 w-11 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-slate-300 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]">
+          <Plus size={17} />
+        </button>
+        <button onClick={() => leafletMap.current?.zoomOut()}
+          className="grid h-11 w-11 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-slate-300 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]">
+          <Minus size={17} />
+        </button>
+      </div>
+
+      {/* Airport detail */}
+      {selectedAirport && (
+        <AirportDetail airport={selectedAirport} userPos={userPos} onClose={() => setSelectedAirport(null)} />
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PAGE
+   ═══════════════════════════════════════════════════════════ */
+export default function Zonas() {
+  return (
+    <main className="fixed inset-0 flex flex-col bg-[#04090f] text-white">
+      <div className="flex-1 relative">
+        <ZonasMap />
+      </div>
+
+      <nav className="shrink-0 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">
         <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">
           {[
             { icon: <Sun size={21} />, label: "Clima", href: "/", active: false },
-            { icon: <Map size={21} />, label: "Zonas", href: "/zonas", active: false },
-            { icon: <Clock3 size={21} />, label: "Previsão", href: "/previsao", active: true },
+            { icon: <Map size={21} />, label: "Zonas", href: "/zonas", active: true },
+            { icon: <Clock3 size={21} />, label: "Previsão", href: "/previsao", active: false },
             { icon: <User size={21} />, label: "Perfil", href: "/perfil", active: false },
           ].map((tab) => (
-            <Link
-              key={tab.label}
-              href={tab.href}
-              className={`flex flex-col items-center gap-1 transition ${
-                tab.active ? "text-cyan-400" : "text-slate-500"
-              }`}
-            >
-              <div
-                className={`grid h-8 w-12 place-items-center rounded-xl transition ${
-                  tab.active ? "bg-cyan-400/[0.1]" : ""
-                }`}
-              >
+            <Link key={tab.label} href={tab.href}
+              className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
+              <div className={`grid h-8 w-12 place-items-center rounded-xl transition ${tab.active ? "bg-cyan-400/[0.1]" : ""}`}>
                 {tab.icon}
               </div>
               <span className={tab.active ? "font-semibold" : ""}>{tab.label}</span>
