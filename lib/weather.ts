@@ -108,3 +108,27 @@ export async function searchCities(query: string) {
   const data = await res.json();
   return data.results || [];
 }
+
+/* ═══════════════════════════════════════════
+   KP INDEX — NOAA Space Weather
+   ═══════════════════════════════════════════ */
+export async function fetchKpIndex(): Promise<{ kp: number; timestamp: string }> {
+  try {
+    const res = await fetch(
+      "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"
+    );
+    if (!res.ok) throw new Error("Kp fetch failed");
+    const data = await res.json();
+    // Data is array of objects, last entry is most recent
+    if (data && data.length > 0) {
+      const latest = data[data.length - 1];
+      return {
+        kp: parseFloat(latest.kp_index) || 0,
+        timestamp: latest.time_tag || "",
+      };
+    }
+  } catch {
+    // silent — Kp is supplementary
+  }
+  return { kp: 0, timestamp: "" };
+}

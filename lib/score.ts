@@ -3,6 +3,7 @@ type ScoreInput = {
   gust: number;
   rainProb: number;
   temp: number;
+  kp?: number;
 };
 
 type ScoreLimits = {
@@ -31,7 +32,7 @@ export function loadLimits(): ScoreLimits {
 }
 
 export function calculateFlightScore(
-  { wind, gust, rainProb, temp }: ScoreInput,
+  { wind, gust, rainProb, temp, kp }: ScoreInput,
   limits?: ScoreLimits
 ) {
   const lim = limits || loadLimits();
@@ -59,6 +60,13 @@ export function calculateFlightScore(
   if (temp < lim.minTemp) score -= 15;
   if (temp > lim.maxTemp) score -= 15;
 
+  // Índice Kp (atividade geomagnética — afeta GPS)
+  if (kp !== undefined && kp > 0) {
+    if (kp >= 5) score -= 25;       // Tempestade geomagnética — risco alto
+    else if (kp >= 4) score -= 15;  // Atividade alta — cuidado
+    else if (kp >= 3) score -= 8;   // Atividade moderada — atenção
+  }
+
   score = Math.max(0, Math.min(100, score));
 
   let label: string;
@@ -79,7 +87,7 @@ export function calculateFlightScore(
 }
 
 export function getRiskNote(
-  type: "wind" | "gust" | "rain" | "temp",
+  type: "wind" | "gust" | "rain" | "temp" | "kp",
   value: number
 ): string {
   const lim = loadLimits();
@@ -108,6 +116,14 @@ export function getRiskNote(
     if (value <= 30) return "Confortável";
     if (value <= lim.maxTemp) return "Quente";
     return "Extremo";
+  }
+  if (type === "kp") {
+    if (value <= 1) return "Calmo";
+    if (value <= 2) return "Estável";
+    if (value <= 3) return "Moderado";
+    if (value <= 4) return "Elevado";
+    if (value <= 5) return "Tempestade";
+    return "Severo";
   }
   return "";
 }

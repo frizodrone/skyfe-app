@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Search, Settings, Wind, Zap, CloudRain, Thermometer,
-  Sun, Map, Clock3, User, Eye, Droplets, MapPin, LocateFixed, X, Star,
+  Sun, Map, Clock3, User, Eye, Droplets, MapPin, LocateFixed, X, Star, Activity,
 } from "lucide-react";
-import { fetchWeather, reverseGeocode, searchCities } from "@/lib/weather";
+import { fetchWeather, reverseGeocode, searchCities, fetchKpIndex } from "@/lib/weather";
 import { calculateFlightScore, getRiskNote } from "@/lib/score";
 import AuthGuard from "@/lib/AuthGuard";
 import { supabase } from "@/lib/supabase";
@@ -220,6 +220,7 @@ function HomeContent() {
   const [currentLon, setCurrentLon] = useState(-46.63);
   const [isFavorite, setIsFavorite] = useState(false);
   const [savingFav, setSavingFav] = useState(false);
+  const [kpIndex, setKpIndex] = useState(0);
 
   const loadWeather = useCallback(async (lat: number, lon: number, name?: string) => {
     setLoading(true); setError("");
@@ -231,7 +232,10 @@ function HomeContent() {
       const rp = data.hourly?.precipitation_probability?.[0] ?? 0;
       // If actually raining, use 100% as rain probability for score
       const effectiveRain = (c.precipitation ?? 0) > 0 ? Math.max(rp, 80) : rp;
-      const res = calculateFlightScore({ wind: c.wind_speed_10m, gust: c.wind_gusts_10m, rainProb: effectiveRain, temp: c.temperature_2m });
+      // Fetch Kp index in parallel
+      const kpData = await fetchKpIndex();
+      setKpIndex(kpData.kp);
+      const res = calculateFlightScore({ wind: c.wind_speed_10m, gust: c.wind_gusts_10m, rainProb: effectiveRain, temp: c.temperature_2m, kp: kpData.kp });
       setScore(res.score); setLabel(res.label); setLevel(res.level);
       if (name) { setPlaceName(name); } else { const geo = await reverseGeocode(lat, lon); setPlaceName(geo); }
       // Check if this location is a favorite
@@ -352,6 +356,7 @@ function HomeContent() {
     if (type === "gust") return val <= 20 ? "good" : val <= 35 ? "warn" : "risk";
     if (type === "rain") return val <= 20 ? "good" : val <= 50 ? "warn" : "risk";
     if (type === "temp") return val >= 5 && val <= 38 ? "good" : val >= 0 && val <= 42 ? "warn" : "risk";
+    if (type === "kp") return val <= 2 ? "good" : val <= 4 ? "warn" : "risk";
     return "good";
   }
 
@@ -360,6 +365,7 @@ function HomeContent() {
     { icon: <Zap size={20} />, title: "RAJADA\nMÁX", value: weather ? `${gust}` : "--", unit: "km/h", note: getRiskNote("gust", gust), metricLevel: getMetricLevel("gust", gust) },
     { icon: <CloudRain size={20} />, title: rainTitle, value: weather ? rainDisplay : "--", unit: rainUnit, note: rainNote, metricLevel: getMetricLevel("rain", rainRiskVal) },
     { icon: <Thermometer size={20} />, title: "TEMP", value: weather ? `${temp}°` : "--", unit: "", note: getRiskNote("temp", temp), metricLevel: getMetricLevel("temp", temp) },
+    { icon: <Activity size={20} />, title: "ÍNDICE\nKP", value: weather ? `${kpIndex.toFixed(1)}` : "--", unit: "", note: getRiskNote("kp", kpIndex), metricLevel: getMetricLevel("kp", kpIndex) },
   ];
 
   /* ── loading screen ── */
@@ -422,7 +428,7 @@ function HomeContent() {
         {error && <div className="mb-4 rounded-2xl border border-red-400/15 bg-red-400/[0.06] px-4 py-3 text-[14px] text-red-200">{error}</div>}
 
         {/* ─── Metric Cards (PRIMEIRO) ─── */}
-        <section className="mb-6 grid grid-cols-4 gap-3">
+        <section className="mb-6 grid grid-cols-5 gap-2">
           {metrics.map((m) => (
             <MetricCard
               key={m.title}
