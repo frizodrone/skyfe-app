@@ -112,9 +112,6 @@ export function useAuth() {
         event: "app_open",
         metadata: { timestamp: new Date().toISOString() },
       });
-      await supabase.rpc("increment_app_opens", { user_id_input: userId }).catch(() => {
-        // RPC may not exist yet, ignore
-      });
     } catch {
       // silent
     }
