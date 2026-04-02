@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   ArrowLeft, Wind, Zap, CloudRain, Thermometer,
-  Sun, Clock3, Map, User, ChevronRight,
+  Sun, Clock3, Map, User, ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -168,6 +168,7 @@ export default function Previsao() {
       };
     });
   }, [weather]);
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
@@ -185,7 +186,7 @@ export default function Previsao() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_34%)]" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-5 pb-28 pt-6">
+      <div className="relative z-10 mx-auto w-full max-w-md px-5 pb-28 pt-6">
 
         {/* Header */}
         <header className="mb-8 flex items-center gap-4">
@@ -195,24 +196,44 @@ export default function Previsao() {
           <h1 className="text-[24px] font-bold tracking-tight">Previsão completa</h1>
         </header>
 
-        {/* Tabs */}
-        <div className="mb-6 flex gap-3">
+        {/* Tabs — v2 with strong highlight */}
+        <div className="mb-8 flex gap-3">
           <button
             onClick={() => setActiveTab("hours")}
-            className={`flex-1 rounded-2xl py-3 text-[14px] font-semibold transition ${activeTab === "hours" ? "bg-cyan-400/[0.12] text-cyan-400 border border-cyan-400/20" : "bg-white/[0.03] text-slate-400 border border-white/[0.06]"}`}
+            className="flex-1 rounded-2xl py-3.5 text-[15px] font-semibold transition-all duration-200"
+            style={activeTab === "hours" ? {
+              background: "linear-gradient(135deg, rgba(45,204,255,0.15) 0%, rgba(45,255,179,0.1) 100%)",
+              border: "1px solid rgba(45,204,255,0.3)",
+              color: "#2dccff",
+              boxShadow: "0 0 20px rgba(45,204,255,0.1)",
+            } : {
+              background: "rgba(255,255,255,0.025)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              color: "#64748b",
+            }}
           >
             Próximas 24h
           </button>
           <button
             onClick={() => setActiveTab("days")}
-            className={`flex-1 rounded-2xl py-3 text-[14px] font-semibold transition ${activeTab === "days" ? "bg-cyan-400/[0.12] text-cyan-400 border border-cyan-400/20" : "bg-white/[0.03] text-slate-400 border border-white/[0.06]"}`}
+            className="flex-1 rounded-2xl py-3.5 text-[15px] font-semibold transition-all duration-200"
+            style={activeTab === "days" ? {
+              background: "linear-gradient(135deg, rgba(45,204,255,0.15) 0%, rgba(45,255,179,0.1) 100%)",
+              border: "1px solid rgba(45,204,255,0.3)",
+              color: "#2dccff",
+              boxShadow: "0 0 20px rgba(45,204,255,0.1)",
+            } : {
+              background: "rgba(255,255,255,0.025)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              color: "#64748b",
+            }}
           >
             16 dias
           </button>
         </div>
 
         {/* Legend */}
-        <div className="mb-6 flex items-center gap-4 text-[12px]">
+        <div className="mb-8 flex items-center gap-4 text-[12px]">
           <span className="flex items-center gap-1.5 text-slate-500">
             <span className="h-[9px] w-[9px] rounded-full bg-[#2dffb3]" /> Seguro
           </span>
@@ -224,85 +245,110 @@ export default function Previsao() {
           </span>
         </div>
 
-        {/* HOURLY VIEW */}
+        {/* HOURLY VIEW — v2 cards */}
         {activeTab === "hours" && (
           <div className="flex flex-col gap-3">
             {hourlyItems.map((h) => (
               <div
                 key={h.time}
-                className="flex items-center gap-4 rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-4"
+                className="relative flex items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4 transition-all duration-200"
+                style={{
+                  background: `linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)`,
+                  border: `1px solid ${LC[h.level]}18`,
+                  boxShadow: `0 0 12px ${LC[h.level]}06`,
+                }}
               >
+                {/* left accent line */}
+                <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full" style={{ background: LC[h.level], opacity: 0.6 }} />
+
                 <div
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-xl"
-                  style={{ background: `${LC[h.level]}12`, border: `1px solid ${LC[h.level]}20` }}
+                  className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
+                  style={{ background: `${LC[h.level]}10`, border: `1px solid ${LC[h.level]}20` }}
                 >
-                  <span className="text-[15px] font-bold" style={{ color: LC[h.level] }}>
+                  <span className="text-[16px] font-bold" style={{ color: LC[h.level] }}>
                     {h.score}
                   </span>
                 </div>
 
                 <div className="flex-1">
-                  <p className="text-[15px] font-semibold text-slate-100">{h.hour}</p>
-                  <p className="mt-1 text-[12px] text-slate-500">
-                    {h.wind} km/h · rajada {h.gust} · chuva {h.rainP}% · {h.temp}°C
-                  </p>
+                  <p className="text-[16px] font-semibold text-slate-100">{h.hour}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-500">
+                    <span className="inline-flex items-center gap-1"><Wind size={11} />{h.wind} km/h</span>
+                    <span className="inline-flex items-center gap-1"><Zap size={11} />{h.gust}</span>
+                    <span className="inline-flex items-center gap-1"><CloudRain size={11} />{h.rainP}%</span>
+                    <span className="inline-flex items-center gap-1"><Thermometer size={11} />{h.temp}°</span>
+                  </div>
                 </div>
 
                 <span
                   className="h-[12px] w-[12px] shrink-0 rounded-full"
-                  style={{ background: LC[h.level], boxShadow: `0 0 8px ${LC[h.level]}33` }}
+                  style={{ background: LC[h.level], boxShadow: `0 0 10px ${LC[h.level]}44` }}
                 />
               </div>
             ))}
           </div>
         )}
 
-        {/* DAILY VIEW */}
+        {/* DAILY VIEW — v2 cards */}
         {activeTab === "days" && (
           <div className="flex flex-col gap-3">
             {dailyItems.map((day) => (
               <div key={day.date}>
                 <button
                   onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)}
-                  className="flex w-full items-center gap-4 rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-4 text-left transition hover:bg-white/[0.04]"
+                  className="relative flex w-full items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4 text-left transition-all duration-200"
+                  style={{
+                    background: `linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)`,
+                    border: `1px solid ${LC[day.level]}18`,
+                    boxShadow: `0 0 12px ${LC[day.level]}06`,
+                  }}
                 >
+                  {/* left accent line */}
+                  <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full" style={{ background: LC[day.level], opacity: 0.6 }} />
+
                   <div
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-xl"
-                    style={{ background: `${LC[day.level]}12`, border: `1px solid ${LC[day.level]}20` }}
+                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
+                    style={{ background: `${LC[day.level]}10`, border: `1px solid ${LC[day.level]}20` }}
                   >
-                    <span className="text-[15px] font-bold" style={{ color: LC[day.level] }}>
+                    <span className="text-[16px] font-bold" style={{ color: LC[day.level] }}>
                       {day.avgScore}
                     </span>
                   </div>
 
                   <div className="flex-1">
-                    <p className="text-[15px] font-semibold text-slate-100">{day.dayLabel}</p>
-                    <p className="mt-1 text-[12px] text-slate-500">
-                      {day.minTemp}°–{day.maxTemp}° · vento {day.maxWind} · chuva {day.maxRain}%
-                    </p>
+                    <p className="text-[16px] font-semibold text-slate-100">{day.dayLabel}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-500">
+                      <span>{day.minTemp}°–{day.maxTemp}°</span>
+                      <span className="inline-flex items-center gap-1"><Wind size={11} />{day.maxWind}</span>
+                      <span className="inline-flex items-center gap-1"><CloudRain size={11} />{day.maxRain}%</span>
+                    </div>
                   </div>
 
-                  <ChevronRight
+                  <ChevronDown
                     size={18}
-                    className={`shrink-0 text-slate-500 transition ${expandedDay === day.date ? "rotate-90" : ""}`}
+                    className={`shrink-0 text-slate-500 transition-transform duration-200 ${expandedDay === day.date ? "rotate-180" : ""}`}
                   />
                 </button>
 
+                {/* expanded hours */}
                 {expandedDay === day.date && day.hours.length > 0 && (
-                  <div className="ml-4 mt-2 flex flex-col gap-2 border-l-2 border-white/[0.06] pl-4">
-                    {day.hours.map((h) => (
-                      <div key={h.time} className="flex items-center gap-3 py-1.5">
-                        <span
-                          className="h-[10px] w-[10px] shrink-0 rounded-full"
-                          style={{ background: LC[h.level] }}
-                        />
-                        <span className="w-[52px] text-[13px] font-medium text-slate-200">{h.hour}</span>
-                        <span className="text-[13px] font-semibold" style={{ color: LC[h.level] }}>{h.score}</span>
-                        <span className="flex-1 text-[11px] text-slate-500">
-                          {h.wind}km/h · {h.rainP}% · {h.temp}°
-                        </span>
-                      </div>
-                    ))}
+                  <div className="mt-2 ml-2 mr-2 rounded-2xl border border-white/[0.04] bg-white/[0.02] p-3">
+                    <div className="flex flex-col gap-2">
+                      {day.hours.map((h) => (
+                        <div key={h.time} className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                          style={{ background: `${LC[h.level]}06` }}>
+                          <span
+                            className="h-[9px] w-[9px] shrink-0 rounded-full"
+                            style={{ background: LC[h.level] }}
+                          />
+                          <span className="w-[50px] text-[13px] font-medium text-slate-200">{h.hour}</span>
+                          <span className="w-[32px] text-[14px] font-bold" style={{ color: LC[h.level] }}>{h.score}</span>
+                          <span className="flex-1 text-[11px] text-slate-500">
+                            {h.wind}km/h · {h.rainP}% · {h.temp}°
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -312,13 +358,13 @@ export default function Previsao() {
       </div>
 
       {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/75 backdrop-blur-xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">
         <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">
           {[
             { icon: <Sun size={21} />, label: "Clima", href: "/", active: false },
-            { icon: <Map size={21} />, label: "Zonas", href: "#", active: false },
+            { icon: <Map size={21} />, label: "Zonas", href: "/zonas", active: false },
             { icon: <Clock3 size={21} />, label: "Previsão", href: "/previsao", active: true },
-            { icon: <User size={21} />, label: "Perfil", href: "#", active: false },
+            { icon: <User size={21} />, label: "Perfil", href: "/perfil", active: false },
           ].map((tab) => (
             <Link key={tab.label} href={tab.href} className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
               <div className={`grid h-8 w-12 place-items-center rounded-xl transition ${tab.active ? "bg-cyan-400/[0.1]" : ""}`}>{tab.icon}</div>

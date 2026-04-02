@@ -53,22 +53,35 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
   const pct = ((value - min) / (max - min)) * 100;
 
   return (
-    <div className="mb-8 rounded-[20px] border border-white/[0.06] bg-white/[0.025] p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 text-[15px] font-medium text-slate-200">
-          {icon}
+    <div
+      className="relative mb-5 overflow-hidden rounded-[20px] p-5"
+      style={{
+        background: `linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)`,
+        border: `1px solid ${color}18`,
+        boxShadow: `0 0 16px ${color}06`,
+      }}
+    >
+      {/* subtle left accent */}
+      <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full" style={{ background: color, opacity: 0.4 }} />
+
+      <div className="mb-5 flex items-center justify-between">
+        <div className="flex items-center gap-3 text-[15px] font-medium text-slate-200">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl"
+            style={{ background: `${color}12`, border: `1px solid ${color}20` }}>
+            <div style={{ color }}>{icon}</div>
+          </div>
           {label}
         </div>
-        <span className="text-[18px] font-bold" style={{ color }}>
+        <span className="text-[20px] font-bold" style={{ color }}>
           {value}{unit}
         </span>
       </div>
 
       <div className="relative">
-        <div className="h-[8px] w-full overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="h-[10px] w-full overflow-hidden rounded-full bg-white/[0.06]">
           <div
             className="h-full rounded-full transition-all duration-150"
-            style={{ width: `${pct}%`, background: color, boxShadow: `0 0 10px ${color}44` }}
+            style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}88, ${color})`, boxShadow: `0 0 14px ${color}44` }}
           />
         </div>
         <input
@@ -78,18 +91,20 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="absolute inset-0 h-[8px] w-full cursor-pointer opacity-0"
+          className="absolute inset-0 h-[10px] w-full cursor-pointer opacity-0"
           style={{ marginTop: 0 }}
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+      <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500">
         <span>{min}{unit}</span>
         <span>{max}{unit}</span>
       </div>
     </div>
   );
-}export default function Configuracoes() {
+}
+
+export default function Configuracoes() {
   const [config, setConfig] = useState<Config>(DEFAULTS);
   const [saved, setSaved] = useState(false);
 
@@ -121,7 +136,7 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_34%)]" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-5 pb-12 pt-6">
+      <div className="relative z-10 mx-auto w-full max-w-md px-5 pb-12 pt-6">
 
         {/* Header */}
         <header className="mb-8 flex items-center gap-4">
@@ -134,9 +149,9 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
           <h1 className="text-[24px] font-bold tracking-tight">Configurações</h1>
         </header>
 
-        {/* Intro */}
-        <div className="mb-8 rounded-[20px] border border-cyan-400/[0.12] bg-cyan-400/[0.04] p-5">
-          <h2 className="mb-2 text-[16px] font-semibold text-cyan-300">Limites personalizados</h2>
+        {/* Intro card */}
+        <div className="mb-8 rounded-[20px] border border-cyan-400/[0.15] bg-cyan-400/[0.04] p-6 shadow-[0_0_20px_rgba(45,204,255,0.06)]">
+          <h2 className="mb-2 text-[17px] font-semibold text-cyan-300">Limites personalizados</h2>
           <p className="text-[13px] leading-relaxed text-slate-400">
             Defina os limites máximos aceitáveis para cada condição climática. O score de voo será calculado com base nesses valores. Pilotos mais experientes podem usar limites mais altos.
           </p>
@@ -145,7 +160,7 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
         {/* Sliders */}
         <Slider
           label="Vento máximo"
-          icon={<Wind size={18} />}
+          icon={<Wind size={17} />}
           value={config.maxWind}
           min={5}
           max={50}
@@ -157,7 +172,7 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
 
         <Slider
           label="Rajada máxima"
-          icon={<Zap size={18} />}
+          icon={<Zap size={17} />}
           value={config.maxGust}
           min={10}
           max={60}
@@ -168,8 +183,8 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
         />
 
         <Slider
-          label="Chuva máxima aceitável"
-          icon={<CloudRain size={18} />}
+          label="Chuva máxima"
+          icon={<CloudRain size={17} />}
           value={config.maxRain}
           min={0}
           max={100}
@@ -180,8 +195,8 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
         />
 
         <Slider
-          label="Temperatura mínima"
-          icon={<Thermometer size={18} />}
+          label="Temp. mínima"
+          icon={<Thermometer size={17} />}
           value={config.minTemp}
           min={-10}
           max={20}
@@ -192,8 +207,8 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
         />
 
         <Slider
-          label="Temperatura máxima"
-          icon={<Thermometer size={18} />}
+          label="Temp. máxima"
+          icon={<Thermometer size={17} />}
           value={config.maxTemp}
           min={25}
           max={50}
@@ -211,7 +226,7 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
         )}
 
         {/* Buttons */}
-        <div className="flex gap-3">
+        <div className="mt-4 flex gap-3">
           <button
             onClick={handleReset}
             className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] py-4 text-[15px] font-medium text-slate-300 transition hover:bg-white/[0.05]"
@@ -228,19 +243,34 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
           </button>
         </div>
 
-        {/* Info */}
-        <div className="mt-8 rounded-[18px] border border-white/[0.06] bg-white/[0.025] p-5">
-          <h3 className="mb-3 text-[15px] font-semibold text-slate-200">Sobre os limites</h3>
-          <div className="flex flex-col gap-3 text-[13px] leading-relaxed text-slate-400">
-            <p>
-              <span className="font-medium text-slate-200">Vento e rajada:</span> Drones menores (Mini, Air) são mais sensíveis. Para drones maiores (Mavic 3, Matrice), você pode aumentar os limites.
-            </p>
-            <p>
-              <span className="font-medium text-slate-200">Chuva:</span> Qualquer probabilidade acima de 30% já representa risco para equipamentos não resistentes à água.
-            </p>
-            <p>
-              <span className="font-medium text-slate-200">Temperatura:</span> Baterias LiPo perdem performance abaixo de 5°C e acima de 38°C. Ajuste conforme seu equipamento.
-            </p>
+        {/* Info section */}
+        <div className="mt-10 rounded-[20px] border border-white/[0.06] bg-white/[0.025] p-6">
+          <h3 className="mb-4 text-[16px] font-semibold text-slate-200">Sobre os limites</h3>
+          <div className="flex flex-col gap-4 text-[13px] leading-relaxed text-slate-400">
+            <div className="flex gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#2dffb3]/10">
+                <Wind size={14} className="text-[#2dffb3]" />
+              </div>
+              <p>
+                <span className="font-medium text-slate-200">Vento e rajada:</span> Drones menores (Mini, Air) são mais sensíveis. Para drones maiores (Mavic 3, Matrice), você pode aumentar os limites.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#ffd84d]/10">
+                <CloudRain size={14} className="text-[#ffd84d]" />
+              </div>
+              <p>
+                <span className="font-medium text-slate-200">Chuva:</span> Qualquer probabilidade acima de 30% já representa risco para equipamentos não resistentes à água.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#ff5a5f]/10">
+                <Thermometer size={14} className="text-[#ff5a5f]" />
+              </div>
+              <p>
+                <span className="font-medium text-slate-200">Temperatura:</span> Baterias LiPo perdem performance abaixo de 5°C e acima de 38°C. Ajuste conforme seu equipamento.
+              </p>
+            </div>
           </div>
         </div>
       </div>
