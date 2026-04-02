@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AuthGuard from "@/lib/AuthGuard";
+import { supabase } from "@/lib/supabase";
 
 type Config = {
   maxWind: number;
@@ -25,20 +26,89 @@ const DEFAULTS: Config = {
 
 const STORAGE_KEY = "skyfe-config";
 
-function loadConfig(): Config {
-  if (typeof window === "undefined") return DEFAULTS;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return DEFAULTS;
-}
+function Configuracoes() {
+  const [config, setConfig] = useState<Config>(DEFAULTS);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-function saveConfig(config: Config) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-  } catch {}
-}
+  useEffect(() => {
+    const loadFromDB = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
+
+      const { data } = await supabase
+        .from("user_settings")
+        .select("max_wind, max_gust, max_rain, min_temp, max_temp")
+        .eq("user_id", user.id)
+        .single();
+
+      if (data) {
+        const c: Config = {
+          maxWind: data.max_wind,
+          maxGust: data.max_gust,
+          maxRain: data.max_rain,
+          minTemp: data.min_temp,
+          maxTemp: data.max_temp,
+        };
+        setConfig(c);
+        // Sync to localStorage for score calculation
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); } catch {}
+      }
+      setLoading(false);
+    };
+    loadFromDB();
+  }, []);
+
+  const update = (key: keyof Config, value: number) => {
+    setConfig((prev) => ({ ...prev, [key]: value }));
+    setSaved(false);
+  };
+
+  const handleSave = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase
+      .from("user_settings")
+      .update({
+        max_wind: config.maxWind,
+        max_gust: config.maxGust,
+        max_rain: config.maxRain,
+        min_temp: config.minTemp,
+        max_temp: config.maxTemp,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id);
+
+    // Sync to localStorage for score calculation
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)); } catch {}
+
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleReset = async () => {
+    setConfig(DEFAULTS);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from("user_settings")
+        .update({
+          max_wind: DEFAULTS.maxWind,
+          max_gust: DEFAULTS.maxGust,
+          max_rain: DEFAULTS.maxRain,
+          min_temp: DEFAULTS.minTemp,
+          max_temp: DEFAULTS.maxTemp,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
+    }
+
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULTS)); } catch {}
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
 
 function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
   label: string;
@@ -104,36 +174,6 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
     </div>
   );
 }
-
-export default function ConfiguracoesWrapper() {
-  return <AuthGuard><Configuracoes /></AuthGuard>;
-}
-
-function Configuracoes() {
-  const [config, setConfig] = useState<Config>(DEFAULTS);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    setConfig(loadConfig());
-  }, []);
-
-  const update = (key: keyof Config, value: number) => {
-    setConfig((prev) => ({ ...prev, [key]: value }));
-    setSaved(false);
-  };
-
-  const handleSave = () => {
-    saveConfig(config);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleReset = () => {
-    setConfig(DEFAULTS);
-    saveConfig(DEFAULTS);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
 
   return (
     <main className="min-h-screen bg-[#04090f] text-white">
@@ -281,4 +321,8 @@ function Configuracoes() {
       </div>
     </main>
   );
+}
+
+export default function ConfiguracoesWrapper() {
+  return <AuthGuard><Configuracoes /></AuthGuard>;
 }

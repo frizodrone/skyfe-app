@@ -31,17 +31,8 @@ const EXP_OPTIONS = [
   { value: "expert", label: "Especialista", color: "#c084fc" },
 ];
 
-const STORAGE_KEY = "skyfe-profile";
 const DEFAULTS: Profile = { name: "", drone: "", experience: "" };
 
-function loadProfile(): Profile {
-  if (typeof window === "undefined") return DEFAULTS;
-  try { const r = localStorage.getItem(STORAGE_KEY); if (r) return JSON.parse(r); } catch {}
-  return DEFAULTS;
-}
-function saveProfileData(p: Profile) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch {}
-}
 function getInitials(name: string): string {
   const p = name.trim().split(/\s+/).filter(Boolean);
   if (p.length >= 2) return (p[0][0] + p[p.length - 1][0]).toUpperCase();
@@ -90,17 +81,50 @@ function Perfil() {
   const [showAbout, setShowAbout] = useState(false);
   const [droneOpen, setDroneOpen] = useState(false);
   const [expOpen, setExpOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const p = loadProfile();
-    setProfile(p);
-    if (!p.name && !p.drone) setEditing(true);
+    const loadFromDB = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("name, drone_model, experience_level")
+        .eq("id", user.id)
+        .single();
+
+      if (data) {
+        const p: Profile = {
+          name: data.name || "",
+          drone: data.drone_model || "",
+          experience: data.experience_level || "",
+        };
+        setProfile(p);
+        if (!p.name && !p.drone) setEditing(true);
+      } else {
+        setEditing(true);
+      }
+      setLoading(false);
+    };
+    loadFromDB();
   }, []);
 
   const update = (key: keyof Profile, value: string) => setProfile((prev) => ({ ...prev, [key]: value }));
 
-  const handleSave = () => {
-    saveProfileData(profile);
+  const handleSave = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase
+      .from("profiles")
+      .update({
+        name: profile.name,
+        drone_model: profile.drone,
+        experience_level: profile.experience,
+      })
+      .eq("id", user.id);
+
     setEditing(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
