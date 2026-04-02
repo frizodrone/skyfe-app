@@ -4,6 +4,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "SkyFe",
   description: "Condições de voo para pilotos de drones",
+  manifest: "/manifest.json",
+  themeColor: "#000000",
 };
 
 export default function RootLayout({
