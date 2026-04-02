@@ -330,14 +330,19 @@ function HomeContent() {
   const wind = weather ? Math.round(weather.current.wind_speed_10m) : 0;
   const gust = weather ? Math.round(weather.current.wind_gusts_10m) : 0;
   const rainP = weather ? (weather.hourly?.precipitation_probability?.[0] ?? 0) : 0;
-  const rainNow = weather ? (weather.current.precipitation ?? 0) : 0;
   const temp = weather ? Math.round(weather.current.temperature_2m) : 0;
 
-  // Use real precipitation if raining, otherwise use probability
+  // Check real precipitation from multiple sources for accuracy
+  const rainCurrent = weather?.current?.precipitation ?? 0;
+  const rainCurrentRain = weather?.current?.rain ?? 0;
+  // Check most recent hourly precipitation
+  const recentHourlyPrecip = weather?.hourly?.precipitation?.[0] ?? 0;
+  // Use the highest value from all sources
+  const rainNow = Math.max(rainCurrent, rainCurrentRain, recentHourlyPrecip);
+
   const rainDisplay = rainNow > 0 ? `${rainNow.toFixed(1)}mm` : `${rainP}%`;
   const rainTitle = rainNow > 0 ? "CHUVA\nAGORA" : "CHUVA\nPROB.";
   const rainUnit = rainNow > 0 ? "agora" : "";
-  // Rain risk: if actually raining, it's always risk. Otherwise use probability
   const rainRiskVal = rainNow > 0 ? 100 : rainP;
   const rainNote = rainNow > 0 ? `Chovendo (${rainP}% prob.)` : getRiskNote("rain", rainP);
 
