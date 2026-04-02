@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Sun, Map, Clock3, User, Settings, Shield, Globe, Info,
-  Edit3, Save, ChevronDown, Plane,
+  Edit3, Save, ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -13,22 +13,52 @@ type Profile = {
   experience: string;
 };
 
-const DRONE_OPTIONS = [
-  { value: "mini", label: "DJI Mini (Mini 2/3/4)" },
-  { value: "air", label: "DJI Air (Air 2/3)" },
-  { value: "mavic", label: "DJI Mavic (Mavic 3/Pro)" },
-  { value: "avata", label: "DJI Avata / FPV" },
-  { value: "matrice", label: "DJI Matrice / Enterprise" },
-  { value: "autel", label: "Autel (EVO / Lite)" },
-  { value: "fpv_custom", label: "FPV Customizado" },
-  { value: "other", label: "Outro" },
+const DRONE_CATEGORIES = [
+  {
+    category: "DJI Consumer",
+    items: [
+      "DJI Mini 2", "DJI Mini 2 SE", "DJI Mini 3", "DJI Mini 3 Pro", "DJI Mini 4 Pro", "DJI Mini 4K",
+      "DJI Air 2", "DJI Air 2S", "DJI Air 3", "DJI Air 3S",
+      "DJI Mavic 3", "DJI Mavic 3 Classic", "DJI Mavic 3 Pro", "DJI Mavic 3 Cine",
+    ],
+  },
+  {
+    category: "DJI FPV",
+    items: ["DJI Avata", "DJI Avata 2", "DJI FPV", "DJI Neo"],
+  },
+  {
+    category: "DJI Enterprise",
+    items: [
+      "DJI Matrice 30", "DJI Matrice 30T", "DJI Matrice 300 RTK", "DJI Matrice 350 RTK",
+      "DJI Mavic 3 Enterprise", "DJI Mavic 3 Thermal", "DJI Mavic 3 Multispectral",
+      "DJI Dock", "DJI Dock 2",
+    ],
+  },
+  {
+    category: "DJI Agrícola",
+    items: [
+      "DJI Agras T10", "DJI Agras T16", "DJI Agras T20", "DJI Agras T25",
+      "DJI Agras T30", "DJI Agras T40", "DJI Agras T50",
+    ],
+  },
+  {
+    category: "Autel",
+    items: [
+      "Autel EVO Nano", "Autel EVO Nano+", "Autel EVO Lite", "Autel EVO Lite+",
+      "Autel EVO II", "Autel EVO II Pro", "Autel EVO II Dual", "Autel EVO Max 4T",
+    ],
+  },
+  {
+    category: "FPV / Outros",
+    items: ["FPV Customizado", "Outro"],
+  },
 ];
 
 const EXP_OPTIONS = [
-  { value: "beginner", label: "Iniciante", desc: "Menos de 6 meses" },
-  { value: "intermediate", label: "Intermediário", desc: "6 meses a 2 anos" },
-  { value: "advanced", label: "Avançado", desc: "2 a 5 anos" },
-  { value: "pro", label: "Profissional", desc: "Mais de 5 anos" },
+  { value: "beginner", label: "Iniciante", desc: "Menos de 6 meses", color: "#94a3b8" },
+  { value: "intermediate", label: "Intermediário", desc: "6 meses a 2 anos", color: "#ffd84d" },
+  { value: "advanced", label: "Avançado", desc: "2 a 5 anos", color: "#2dccff" },
+  { value: "pro", label: "Profissional", desc: "Mais de 5 anos", color: "#2dffb3" },
 ];
 
 const STORAGE_KEY = "skyfe-profile";
@@ -47,11 +77,53 @@ function saveProfile(p: Profile) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch {}
 }
 
+/* ─── Dropdown ─── */
+function Dropdown({ label, value, placeholder, children, open, onToggle }: {
+  label: string; value: string; placeholder: string;
+  children: React.ReactNode; open: boolean; onToggle: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node) && open) onToggle();
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open, onToggle]);
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="mb-2 block text-[12px] font-medium uppercase tracking-wider text-slate-500">{label}</label>
+      <button
+        onClick={onToggle}
+        className="flex w-full items-center justify-between rounded-2xl px-4 py-4 text-left transition-all"
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          border: open ? "1px solid rgba(45,204,255,0.3)" : "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <span className={value ? "text-[14px] font-medium text-slate-100" : "text-[14px] text-slate-500"}>
+          {value || placeholder}
+        </span>
+        <ChevronDown size={16} className={`text-slate-500 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[320px] overflow-y-auto rounded-2xl border border-white/[0.1] bg-[#0a1220] shadow-[0_12px_40px_rgba(0,0,0,0.5)] no-scrollbar">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Perfil() {
   const [profile, setProfile] = useState<Profile>(DEFAULTS);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [droneOpen, setDroneOpen] = useState(false);
+  const [expOpen, setExpOpen] = useState(false);
 
   useEffect(() => {
     const p = loadProfile();
@@ -67,10 +139,9 @@ export default function Perfil() {
     saveProfile(profile);
     setEditing(false);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => setSaved(false), 2500);
   };
 
-  const droneLabel = DRONE_OPTIONS.find((d) => d.value === profile.drone)?.label || "";
   const expOption = EXP_OPTIONS.find((e) => e.value === profile.experience);
 
   return (
@@ -89,7 +160,7 @@ export default function Perfil() {
             </Link>
             <h1 className="text-[24px] font-bold tracking-tight">Perfil</h1>
           </div>
-          {!editing && (
+          {!editing && profile.name && (
             <button
               onClick={() => setEditing(true)}
               className="flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.06] px-4 py-2.5 text-[13px] font-medium text-cyan-400 transition hover:bg-cyan-400/[0.1]"
@@ -102,125 +173,137 @@ export default function Perfil() {
 
         {/* Saved feedback */}
         {saved && (
-          <div className="mb-6 rounded-[16px] border border-emerald-400/20 bg-emerald-400/[0.08] px-4 py-3 text-center text-[14px] font-medium text-emerald-300">
+          <div className="mb-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] px-4 py-3.5 text-center text-[14px] font-medium text-emerald-300">
             Perfil salvo com sucesso!
           </div>
         )}
 
-        {/* Profile card */}
-        <section className="mb-8 overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.03]">
-          {/* avatar area */}
-          <div className="flex flex-col items-center border-b border-white/[0.06] bg-gradient-to-b from-cyan-400/[0.06] to-transparent px-6 py-8">
-            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border-2 border-cyan-400/30 bg-cyan-400/[0.08]">
-              {profile.name ? (
-                <span className="text-[32px] font-bold text-cyan-400">
+        {/* ═══ VIEWING MODE ═══ */}
+        {!editing && profile.name && (
+          <section className="relative mb-10 overflow-hidden rounded-[28px] border border-cyan-400/[0.12] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] shadow-[0_0_40px_rgba(45,204,255,0.06)]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,_rgba(45,204,255,0.08),_transparent_50%)]" />
+
+            <div className="relative z-10 flex flex-col items-center px-6 py-10">
+              {/* avatar */}
+              <div className="mb-5 flex h-24 w-24 items-center justify-center rounded-full border-2 shadow-[0_0_30px_rgba(45,204,255,0.15)]"
+                style={{ borderColor: expOption?.color || "#2dccff", background: `${expOption?.color || "#2dccff"}10` }}>
+                <span className="text-[38px] font-bold" style={{ color: expOption?.color || "#2dccff" }}>
                   {profile.name.charAt(0).toUpperCase()}
                 </span>
-              ) : (
-                <User size={32} className="text-cyan-400/60" />
+              </div>
+
+              <h2 className="text-[24px] font-bold text-white">{profile.name}</h2>
+
+              {profile.drone && (
+                <p className="mt-2 text-[14px] text-slate-400">{profile.drone}</p>
+              )}
+
+              {expOption && (
+                <div className="mt-4 flex items-center gap-2 rounded-full px-5 py-2"
+                  style={{ background: `${expOption.color}10`, border: `1px solid ${expOption.color}25` }}>
+                  <span className="h-2 w-2 rounded-full" style={{ background: expOption.color }} />
+                  <span className="text-[13px] font-semibold" style={{ color: expOption.color }}>
+                    {expOption.label}
+                  </span>
+                  <span className="text-[12px]" style={{ color: `${expOption.color}88` }}>
+                    · {expOption.desc}
+                  </span>
+                </div>
               )}
             </div>
-            {editing ? (
+          </section>
+        )}
+
+        {/* ═══ EDITING MODE ═══ */}
+        {editing && (
+          <section className="mb-10 overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.02]">
+            {/* avatar + name */}
+            <div className="flex flex-col items-center border-b border-white/[0.06] bg-gradient-to-b from-cyan-400/[0.04] to-transparent px-6 pt-8 pb-6">
+              <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full border-2 border-cyan-400/25 bg-cyan-400/[0.06]">
+                {profile.name ? (
+                  <span className="text-[32px] font-bold text-cyan-400">
+                    {profile.name.charAt(0).toUpperCase()}
+                  </span>
+                ) : (
+                  <User size={30} className="text-cyan-400/50" />
+                )}
+              </div>
               <input
                 type="text"
                 value={profile.name}
                 onChange={(e) => update("name", e.target.value)}
-                placeholder="Seu nome de piloto"
-                className="w-full max-w-[240px] rounded-xl border border-white/[0.1] bg-white/[0.04] px-4 py-3 text-center text-[16px] font-medium text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/30"
+                placeholder="Nome do piloto"
+                className="w-full max-w-[260px] rounded-2xl border border-white/[0.1] bg-white/[0.04] px-4 py-3.5 text-center text-[16px] font-medium text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/30 transition"
               />
-            ) : (
-              <h2 className="text-[22px] font-bold text-slate-100">
-                {profile.name || "Piloto SkyFe"}
-              </h2>
-            )}
-            {!editing && droneLabel && (
-              <p className="mt-2 text-[13px] text-slate-400">{droneLabel}</p>
-            )}
-            {!editing && expOption && (
-              <span
-                className="mt-3 rounded-full px-4 py-1.5 text-[12px] font-medium"
-                style={{
-                  background: profile.experience === "pro" ? "rgba(45,255,179,0.1)" :
-                    profile.experience === "advanced" ? "rgba(45,204,255,0.1)" :
-                    profile.experience === "intermediate" ? "rgba(255,216,77,0.1)" : "rgba(255,255,255,0.04)",
-                  border: `1px solid ${profile.experience === "pro" ? "rgba(45,255,179,0.2)" :
-                    profile.experience === "advanced" ? "rgba(45,204,255,0.2)" :
-                    profile.experience === "intermediate" ? "rgba(255,216,77,0.2)" : "rgba(255,255,255,0.08)"}`,
-                  color: profile.experience === "pro" ? "#2dffb3" :
-                    profile.experience === "advanced" ? "#2dccff" :
-                    profile.experience === "intermediate" ? "#ffd84d" : "#94a3b8",
-                }}
+            </div>
+
+            {/* fields */}
+            <div className="flex flex-col gap-6 p-6">
+              {/* Drone dropdown */}
+              <Dropdown
+                label="Modelo do drone"
+                value={profile.drone}
+                placeholder="Selecione seu drone"
+                open={droneOpen}
+                onToggle={() => { setDroneOpen(!droneOpen); setExpOpen(false); }}
               >
-                {expOption.label} · {expOption.desc}
-              </span>
-            )}
-          </div>
+                {DRONE_CATEGORIES.map((cat) => (
+                  <div key={cat.category}>
+                    <p className="sticky top-0 bg-[#0a1220] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-white/[0.04]">
+                      {cat.category}
+                    </p>
+                    {cat.items.map((item) => (
+                      <button
+                        key={item}
+                        onClick={() => { update("drone", item); setDroneOpen(false); }}
+                        className="flex w-full items-center px-4 py-3 text-[14px] text-left transition hover:bg-white/[0.04]"
+                        style={profile.drone === item ? { color: "#2dccff", background: "rgba(45,204,255,0.06)" } : { color: "#cbd5e1" }}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </Dropdown>
 
-          {/* edit fields */}
-          {editing && (
-            <div className="flex flex-col gap-5 p-6">
-              {/* drone select */}
-              <div>
-                <label className="mb-2 block text-[12px] font-medium uppercase tracking-wider text-slate-500">Modelo do drone</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {DRONE_OPTIONS.map((d) => (
-                    <button
-                      key={d.value}
-                      onClick={() => update("drone", d.value)}
-                      className="rounded-xl px-3 py-3 text-left text-[12px] font-medium transition-all duration-150"
-                      style={profile.drone === d.value ? {
-                        background: "rgba(45,204,255,0.1)",
-                        border: "1px solid rgba(45,204,255,0.25)",
-                        color: "#2dccff",
-                      } : {
-                        background: "rgba(255,255,255,0.025)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        color: "#94a3b8",
-                      }}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Experience dropdown */}
+              <Dropdown
+                label="Nível de experiência"
+                value={expOption ? `${expOption.label} — ${expOption.desc}` : ""}
+                placeholder="Selecione seu nível"
+                open={expOpen}
+                onToggle={() => { setExpOpen(!expOpen); setDroneOpen(false); }}
+              >
+                {EXP_OPTIONS.map((e) => (
+                  <button
+                    key={e.value}
+                    onClick={() => { update("experience", e.value); setExpOpen(false); }}
+                    className="flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-white/[0.04]"
+                    style={profile.experience === e.value ? { background: `${e.color}08` } : {}}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: e.color }} />
+                      <span className="text-[14px] font-medium" style={{ color: profile.experience === e.value ? e.color : "#cbd5e1" }}>
+                        {e.label}
+                      </span>
+                    </div>
+                    <span className="text-[12px] text-slate-500">{e.desc}</span>
+                  </button>
+                ))}
+              </Dropdown>
 
-              {/* experience select */}
-              <div>
-                <label className="mb-2 block text-[12px] font-medium uppercase tracking-wider text-slate-500">Nível de experiência</label>
-                <div className="flex flex-col gap-2">
-                  {EXP_OPTIONS.map((e) => (
-                    <button
-                      key={e.value}
-                      onClick={() => update("experience", e.value)}
-                      className="flex items-center justify-between rounded-xl px-4 py-3.5 text-left transition-all duration-150"
-                      style={profile.experience === e.value ? {
-                        background: "rgba(45,204,255,0.1)",
-                        border: "1px solid rgba(45,204,255,0.25)",
-                        color: "#2dccff",
-                      } : {
-                        background: "rgba(255,255,255,0.025)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        color: "#94a3b8",
-                      }}
-                    >
-                      <span className="text-[14px] font-medium">{e.label}</span>
-                      <span className="text-[11px] opacity-70">{e.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* save button */}
+              {/* save */}
               <button
                 onClick={handleSave}
-                className="mt-2 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-4 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105"
+                disabled={!profile.name.trim()}
+                className="mt-2 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-4 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Save size={16} />
                 Salvar perfil
               </button>
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
         {/* Quick links */}
         <section className="mb-8">
@@ -257,7 +340,7 @@ export default function Perfil() {
         </section>
 
         {/* About — collapsible */}
-        <section className="mb-8">
+        <section className="mb-6">
           <button
             onClick={() => setShowAbout(!showAbout)}
             className="flex w-full items-center justify-between rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-4 text-left transition hover:bg-white/[0.04]"
@@ -268,51 +351,34 @@ export default function Perfil() {
               </div>
               <span className="text-[14px] font-medium text-slate-200">Sobre o SkyFe</span>
             </div>
-            <ChevronDown
-              size={18}
-              className={`text-slate-500 transition-transform duration-200 ${showAbout ? "rotate-180" : ""}`}
-            />
+            <ChevronDown size={18} className={`text-slate-500 transition-transform duration-200 ${showAbout ? "rotate-180" : ""}`} />
           </button>
 
           {showAbout && (
             <div className="mt-2 rounded-[18px] border border-white/[0.04] bg-white/[0.02] p-5">
-              {/* App identity */}
-              <div className="mb-5 flex items-center gap-4">
-                <div className="grid h-14 w-14 place-items-center rounded-[16px] border border-cyan-400/[0.15] bg-cyan-400/[0.06]">
-                  <div className="relative h-6 w-6">
-                    <span className="absolute left-0 top-0 h-[8px] w-[8px] rounded-full border-[1.5px] border-cyan-400/90" />
-                    <span className="absolute right-0 top-0 h-[8px] w-[8px] rounded-full border-[1.5px] border-cyan-400/90" />
-                    <span className="absolute bottom-0 left-0 h-[8px] w-[8px] rounded-full border-[1.5px] border-cyan-400/90" />
-                    <span className="absolute bottom-0 right-0 h-[8px] w-[8px] rounded-full border-[1.5px] border-cyan-400/90" />
-                    <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] bg-cyan-400" />
+              <div className="mb-4 flex items-center gap-4">
+                <div className="grid h-12 w-12 place-items-center rounded-[14px] border border-cyan-400/[0.15] bg-cyan-400/[0.06]">
+                  <div className="relative h-5 w-5">
+                    <span className="absolute left-0 top-0 h-[7px] w-[7px] rounded-full border-[1.5px] border-cyan-400/90" />
+                    <span className="absolute right-0 top-0 h-[7px] w-[7px] rounded-full border-[1.5px] border-cyan-400/90" />
+                    <span className="absolute bottom-0 left-0 h-[7px] w-[7px] rounded-full border-[1.5px] border-cyan-400/90" />
+                    <span className="absolute bottom-0 right-0 h-[7px] w-[7px] rounded-full border-[1.5px] border-cyan-400/90" />
+                    <span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] bg-cyan-400" />
                   </div>
                 </div>
                 <div>
-                  <h2 className="text-[20px] font-bold tracking-tight">
-                    Sky<span className="text-cyan-400">Fe</span>
-                  </h2>
+                  <h2 className="text-[18px] font-bold">Sky<span className="text-cyan-400">Fe</span></h2>
                   <p className="text-[12px] text-slate-500">Versão 2.0.0</p>
                 </div>
               </div>
-
               <p className="mb-4 text-[13px] leading-relaxed text-slate-400">
-                Sistema de decisão de voo para pilotos de drones. Analisa condições climáticas em tempo real e calcula um score de 0 a 100 indicando se é seguro voar.
+                Sistema de decisão de voo para pilotos de drones. Analisa condições climáticas em tempo real e calcula um score de 0 a 100.
               </p>
-
-              <div className="flex flex-col gap-2.5 text-[12px] text-slate-500">
-                <div className="flex items-center gap-2.5">
-                  <Globe size={14} className="text-slate-600" />
-                  <span>Dados climáticos: Open-Meteo</span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <Map size={14} className="text-slate-600" />
-                  <span>Mapas: OpenStreetMap / CartoDB</span>
-                </div>
+              <div className="flex flex-col gap-2 text-[12px] text-slate-500">
+                <div className="flex items-center gap-2.5"><Globe size={13} className="text-slate-600" /><span>Dados: Open-Meteo</span></div>
+                <div className="flex items-center gap-2.5"><Map size={13} className="text-slate-600" /><span>Mapas: OpenStreetMap</span></div>
               </div>
-
-              <p className="mt-4 text-[11px] text-slate-600">
-                Desenvolvido por Frizodrone © 2025
-              </p>
+              <p className="mt-4 text-[11px] text-slate-600">Desenvolvido por Frizodrone © 2025</p>
             </div>
           )}
         </section>
