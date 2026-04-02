@@ -695,9 +695,7 @@ function ZonasMap() {
       maxZoom: 18,
     }).addTo(map);
 
-    // Keep layers on top
-    if (layerGroupRef.current) layerGroupRef.current.bringToFront();
-    if (heliLayerRef.current) heliLayerRef.current.bringToFront();
+    // Layers stay on top automatically since tile is added first
   }, [mapStyle]);
 
   const handleLocate = useCallback(() => {
