@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Sun, Clock3, Map, User, Layers, Plane, AlertTriangle,
-  ChevronDown, ChevronUp, X, LocateFixed, Minus, Plus,
+  ChevronDown, ChevronUp, X, LocateFixed, Minus, Plus, Search,
 } from "lucide-react";
 import Link from "next/link";
 import AuthGuard from "@/lib/AuthGuard";
+import { searchCities } from "@/lib/weather";
 
 /* ═══════════════════════════════════════════════════════════
    TYPES
@@ -476,6 +477,11 @@ function ZonasMap() {
   const [userPos, setUserPos] = useState<[number, number]>([-23.55, -46.63]);
   const [loadingAirports, setLoadingAirports] = useState(false);
   const [stats, setStats] = useState({ airports: 0, heliports: 0 });
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const rangeCircleRef = useRef<any>(null);
 
   // Init map
   useEffect(() => {
@@ -657,6 +663,19 @@ function ZonasMap() {
     userMarker.bindTooltip("Sua localização", { direction: "top", offset: [0, -12] });
     layerGroupRef.current.addLayer(userMarker);
 
+    // Range circle (5km)
+    if (rangeCircleRef.current) rangeCircleRef.current.remove();
+    rangeCircleRef.current = L.circle(userPos, {
+      radius: 5000,
+      color: "#2dccff",
+      weight: 1.5,
+      opacity: 0.4,
+      fillColor: "#2dccff",
+      fillOpacity: 0.04,
+      dashArray: "6,4",
+    }).addTo(map);
+    rangeCircleRef.current.bindTooltip("Raio de 5 km", { direction: "top" });
+
     // Check initial zoom for heliports
     const z = map.getZoom();
     if (z < 12 && map.hasLayer(heliLayerRef.current)) {
@@ -728,6 +747,11 @@ function ZonasMap() {
 
       {/* Controls */}
       <div className="absolute right-3 bottom-24 z-[1000] flex flex-col gap-2">
+        <button onClick={() => setShowSearch(!showSearch)}
+          className="grid h-11 w-11 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-cyan-400 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]"
+          title="Buscar local">
+          <Search size={17} />
+        </button>
         <button onClick={() => setMapStyle(mapStyle === "dark" ? "satellite" : "dark")}
           className="grid h-11 w-11 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-slate-300 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]"
           title={mapStyle === "dark" ? "Satélite" : "Escuro"}>
@@ -747,6 +771,54 @@ function ZonasMap() {
           <Minus size={17} />
         </button>
       </div>
+
+      {/* Search overlay */}
+      {showSearch && (
+        <div className="absolute top-14 left-3 right-3 z-[1001]">
+          <div className="rounded-2xl border border-white/[0.1] bg-[#0a1222]/95 shadow-xl backdrop-blur-xl overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06]">
+              <Search size={15} className="text-slate-500" />
+              <input
+                type="text"
+                placeholder="Buscar cidade ou local..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (e.target.value.length >= 2) {
+                    setSearching(true);
+                    searchCities(e.target.value).then((r) => { setSearchResults(r); setSearching(false); });
+                  } else {
+                    setSearchResults([]);
+                  }
+                }}
+                autoFocus
+                className="flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-slate-600"
+              />
+              <button onClick={() => { setShowSearch(false); setSearchQuery(""); setSearchResults([]); }}
+                className="text-slate-500 hover:text-slate-300">
+                <X size={16} />
+              </button>
+            </div>
+            {searching && <p className="px-4 py-2 text-[12px] text-slate-500">Buscando...</p>}
+            {searchResults.length > 0 && (
+              <div className="max-h-[200px] overflow-y-auto">
+                {searchResults.map((r: any) => (
+                  <button key={r.id} onClick={() => {
+                    const latlng: [number, number] = [r.latitude, r.longitude];
+                    setUserPos(latlng);
+                    leafletMap.current?.setView(latlng, 12, { animate: true });
+                    setShowSearch(false); setSearchQuery(""); setSearchResults([]);
+                  }}
+                    className="flex w-full flex-col gap-0.5 px-4 py-3 text-left border-b border-white/[0.04] hover:bg-white/[0.04] transition">
+                    <span className="text-[13px] font-medium text-white">{r.name}</span>
+                    <span className="text-[11px] text-slate-500">{[r.admin1, r.country].filter(Boolean).join(", ")}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Airport detail */}
       {selectedAirport && (
