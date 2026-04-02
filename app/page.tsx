@@ -69,30 +69,30 @@ function SearchModal({ onSelect, onClose }: { onSelect: (r: any) => void; onClos
 /* ───── Radar ───── */
 function Radar({ score, level }: { score: number; level: Level }) {
   const color = LC[level];
-  const circ = 2 * Math.PI * 62;
+  const circ = 2 * Math.PI * 76;
   const off = circ - (score / 100) * circ;
   return (
-    <div className="relative h-[180px] w-[180px] animate-float">
-      <svg width="180" height="180" viewBox="0 0 180 180" className="absolute inset-0 opacity-20">
-        {[70, 56, 42, 28].map((r) => (<circle key={r} cx="90" cy="90" r={r} fill="none" stroke="#2dccff" strokeWidth="0.5" />))}
-        <line x1="20" y1="90" x2="160" y2="90" stroke="#2dccff" strokeWidth="0.4" />
-        <line x1="90" y1="20" x2="90" y2="160" stroke="#2dccff" strokeWidth="0.4" />
+    <div className="relative h-[220px] w-[220px] animate-float">
+      <svg width="220" height="220" viewBox="0 0 220 220" className="absolute inset-0 opacity-20">
+        {[86, 68, 52, 36].map((r) => (<circle key={r} cx="110" cy="110" r={r} fill="none" stroke="#2dccff" strokeWidth="0.5" />))}
+        <line x1="24" y1="110" x2="196" y2="110" stroke="#2dccff" strokeWidth="0.4" />
+        <line x1="110" y1="24" x2="110" y2="196" stroke="#2dccff" strokeWidth="0.4" />
       </svg>
       <div className="absolute inset-4 overflow-hidden rounded-full animate-radar-spin opacity-30">
         <div className="h-full w-full rounded-full" style={{ background: `conic-gradient(from 300deg, ${color}33, transparent 20%)` }} />
       </div>
-      <svg width="180" height="180" viewBox="0 0 180 180" className="absolute inset-0">
-        <circle cx="90" cy="90" r="62" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="8" />
-        <circle cx="90" cy="90" r="62" fill="none" stroke={color} strokeWidth="8"
-          strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round" transform="rotate(-90 90 90)"
-          style={{ filter: `drop-shadow(0 0 12px ${color}66)`, transition: "stroke-dashoffset 1.2s ease-out, stroke 0.6s ease" }} />
+      <svg width="220" height="220" viewBox="0 0 220 220" className="absolute inset-0">
+        <circle cx="110" cy="110" r="76" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="8" />
+        <circle cx="110" cy="110" r="76" fill="none" stroke={color} strokeWidth="8"
+          strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round" transform="rotate(-90 110 110)"
+          style={{ filter: `drop-shadow(0 0 14px ${color}66)`, transition: "stroke-dashoffset 1.2s ease-out, stroke 0.6s ease" }} />
       </svg>
-      <div className="absolute inset-7 flex flex-col items-center justify-center rounded-full border border-white/5 bg-[#04090f]/85">
+      <div className="absolute inset-8 flex flex-col items-center justify-center rounded-full border border-white/5 bg-[#04090f]/85">
         <div className="flex items-end justify-center gap-1">
-          <span className="text-[48px] font-bold leading-none tracking-[-0.04em]" style={{ textShadow: `0 0 20px ${color}22` }}>{score}</span>
-          <span className="mb-1.5 text-[18px] text-white/45">/100</span>
+          <span className="text-[56px] font-bold leading-none tracking-[-0.04em]" style={{ textShadow: `0 0 20px ${color}22` }}>{score}</span>
+          <span className="mb-2 text-[20px] text-white/45">/100</span>
         </div>
-        <p className="mt-1 text-[8px] uppercase tracking-[0.2em] text-white/40">Pontuação de voo</p>
+        <p className="mt-1 text-[9px] uppercase tracking-[0.2em] text-white/40">Pontuação de voo</p>
       </div>
     </div>
   );
@@ -115,14 +115,29 @@ function MetricCard({ icon, title, value, unit, note, level }: {
       {/* subtle top glow */}
       <div className="absolute -top-3 left-1/2 h-6 w-10 -translate-x-1/2 rounded-full opacity-35 blur-lg" style={{ background: color }} />
 
-      <div className="relative z-10 mb-2 flex justify-center" style={{ color }}>
+      {/* icon — fixed height */}
+      <div className="relative z-10 flex h-[24px] items-center justify-center" style={{ color }}>
         {icon}
       </div>
-      <p className="relative z-10 min-h-[26px] whitespace-pre-line text-[9px] uppercase leading-tight tracking-[0.1em] text-slate-500">{title}</p>
-      <div className="relative z-10 mt-auto flex flex-1 flex-col items-center justify-center">
+
+      {/* title — fixed height to align across cards */}
+      <div className="relative z-10 mt-2 flex h-[32px] items-center justify-center">
+        <p className="whitespace-pre-line text-[9px] uppercase leading-tight tracking-[0.1em] text-slate-500">{title}</p>
+      </div>
+
+      {/* value — fixed height to align across cards */}
+      <div className="relative z-10 mt-3 flex h-[30px] items-end justify-center">
         <p className="text-[24px] font-semibold leading-none tracking-tight text-white">{value}</p>
-        {unit && <p className="mt-1 text-[11px] text-slate-500">{unit}</p>}
-        <p className="mt-1.5 text-[10px] font-medium" style={{ color: `${color}bb` }}>{note}</p>
+      </div>
+
+      {/* unit — fixed height */}
+      <div className="relative z-10 flex h-[18px] items-center justify-center">
+        {unit ? <p className="text-[11px] text-slate-500">{unit}</p> : <span />}
+      </div>
+
+      {/* note — fixed height to align across cards */}
+      <div className="relative z-10 flex h-[16px] items-center justify-center">
+        <p className="text-[10px] font-medium" style={{ color: `${color}bb` }}>{note}</p>
       </div>
     </div>
   );
@@ -298,13 +313,13 @@ export default function Home() {
         {error && <div className="mb-4 rounded-2xl border border-red-400/15 bg-red-400/[0.06] px-4 py-3 text-[14px] text-red-200">{error}</div>}
 
         {/* ─── Score / Radar Section (v2 — refined frame) ─── */}
-        <section className="relative mb-8 overflow-hidden rounded-[28px] border border-cyan-400/[0.12] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] px-5 py-8 shadow-[0_0_50px_rgba(45,204,255,0.06)]">
+        <section className="relative mb-10 overflow-hidden rounded-[28px] border border-cyan-400/[0.12] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] px-5 py-8 shadow-[0_0_50px_rgba(45,204,255,0.06)]">
           {/* double border glow */}
           <div className="pointer-events-none absolute inset-0 rounded-[28px] border border-cyan-400/[0.06]" style={{ margin: "3px" }} />
           {/* radial glow */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,_rgba(45,204,255,0.1),_transparent_50%)]" />
           {/* radar rings background */}
-          <div className="pointer-events-none absolute left-1/2 top-[33%] h-[250px] w-[250px] -translate-x-1/2 -translate-y-1/2">
+          <div className="pointer-events-none absolute left-1/2 top-[33%] h-[290px] w-[290px] -translate-x-1/2 -translate-y-1/2">
             <div className="absolute inset-0 rounded-full border border-cyan-300/[0.08]" />
             <div className="absolute inset-[22px] rounded-full border border-cyan-300/[0.06]" />
             <div className="absolute inset-[44px] rounded-full border border-cyan-300/[0.06]" />
@@ -342,7 +357,7 @@ export default function Home() {
         </section>
 
         {/* ─── Metric Cards v2 (with glow borders) ─── */}
-        <section className="mb-8 grid grid-cols-4 gap-3">
+        <section className="mb-10 grid grid-cols-4 gap-3">
           {metrics.map((m) => (
             <MetricCard
               key={m.title}
@@ -357,7 +372,7 @@ export default function Home() {
         </section>
 
         {/* ─── Hourly Forecast v2 (mini cards, horizontal scroll) ─── */}
-        <section className="mb-8">
+        <section className="mb-10">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-[20px] font-bold tracking-tight">Previsão por hora</h3>
             <div className="flex items-center gap-3 text-[11px]">
@@ -376,7 +391,7 @@ export default function Home() {
 
           {/* best window */}
           {bestWindow && (
-            <div className="mt-4 rounded-2xl border border-cyan-400/[0.1] bg-cyan-400/[0.04] px-4 py-3.5 text-center">
+            <div className="mt-6 rounded-2xl border border-cyan-400/[0.1] bg-cyan-400/[0.04] px-4 py-3.5 text-center">
               <p className="inline-flex items-center gap-2 text-[13px] text-cyan-300">
                 <LocateFixed size={13} />
                 Próxima janela recomendada entre <span className="font-semibold">{bestWindow}</span>
