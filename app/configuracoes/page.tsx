@@ -5,6 +5,7 @@ import {
   ArrowLeft, Wind, Zap, CloudRain, Thermometer, RotateCcw, Save,
 } from "lucide-react";
 import Link from "next/link";
+import AuthGuard from "@/lib/AuthGuard";
 
 type Config = {
   maxWind: number;
@@ -104,7 +105,11 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
   );
 }
 
-export default function Configuracoes() {
+export default function ConfiguracoesWrapper() {
+  return <AuthGuard><Configuracoes /></AuthGuard>;
+}
+
+function Configuracoes() {
   const [config, setConfig] = useState<Config>(DEFAULTS);
   const [saved, setSaved] = useState(false);
 

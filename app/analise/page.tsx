@@ -8,6 +8,7 @@ import {
 import { fetchWeather } from "@/lib/weather";
 import { calculateFlightScore, getRiskNote } from "@/lib/score";
 import Link from "next/link";
+import AuthGuard from "@/lib/AuthGuard";
 
 type Level = "good" | "warn" | "risk";
 
@@ -83,7 +84,11 @@ function FactorCard({ title, icon, note, level, impact, riskLabel }: {
   );
 }
 
-export default function Analise() {
+export default function AnaliseWrapper() {
+  return <AuthGuard><Analise /></AuthGuard>;
+}
+
+function Analise() {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<any>(null);
   const [score, setScore] = useState(0);

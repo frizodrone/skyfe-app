@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, X, LocateFixed, Minus, Plus,
 } from "lucide-react";
 import Link from "next/link";
+import AuthGuard from "@/lib/AuthGuard";
 
 /* ═══════════════════════════════════════════════════════════
    TYPES
@@ -758,7 +759,11 @@ function ZonasMap() {
 /* ═══════════════════════════════════════════════════════════
    PAGE
    ═══════════════════════════════════════════════════════════ */
-export default function Zonas() {
+export default function ZonasWrapper() {
+  return <AuthGuard><ZonasPage /></AuthGuard>;
+}
+
+function ZonasPage() {
   return (
     <main className="fixed inset-0 flex flex-col bg-[#04090f] text-white">
       <div className="flex-1 relative">

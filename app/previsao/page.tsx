@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { calculateFlightScore } from "@/lib/score";
+import AuthGuard from "@/lib/AuthGuard";
 
 type Level = "good" | "warn" | "risk";
 
@@ -42,7 +43,11 @@ type DayItem = {
   hours: HourItem[];
 };
 
-export default function Previsao() {
+export default function PrevisaoWrapper() {
+  return <AuthGuard><Previsao /></AuthGuard>;
+}
+
+function Previsao() {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"hours" | "days">("hours");

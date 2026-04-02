@@ -6,6 +6,8 @@ import {
   Edit3, Save, ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
+import AuthGuard from "@/lib/AuthGuard";
+import { supabase } from "@/lib/supabase";
 
 type Profile = { name: string; drone: string; experience: string };
 
@@ -77,7 +79,11 @@ function Dropdown({ label, value, placeholder, children, open, onToggle }: {
   );
 }
 
-export default function Perfil() {
+export default function PerfilWrapper() {
+  return <AuthGuard><Perfil /></AuthGuard>;
+}
+
+function Perfil() {
   const [profile, setProfile] = useState<Profile>(DEFAULTS);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -295,7 +301,7 @@ export default function Perfil() {
                 </div>
                 <div>
                   <h2 className="text-[20px] font-bold">Sky<span className="text-cyan-400">Fe</span></h2>
-                  <p className="text-[13px] text-slate-500">Versão 2.0.0</p>
+                  <p className="text-[13px] text-slate-500">Versão 2.5.0</p>
                 </div>
               </div>
               <p className="mb-4 text-[14px] leading-relaxed text-slate-400">
@@ -305,9 +311,22 @@ export default function Perfil() {
                 <div className="flex items-center gap-2.5"><Globe size={14} className="text-slate-600" /><span>Dados: Open-Meteo</span></div>
                 <div className="flex items-center gap-2.5"><Map size={14} className="text-slate-600" /><span>Mapas: OpenStreetMap</span></div>
               </div>
-              <p className="mt-5 text-[12px] text-slate-600">Desenvolvido por Frizodrone © 2025</p>
+              <p className="mt-5 text-[12px] text-slate-600">Desenvolvido por Frizodrone © 2025-2026</p>
             </div>
           )}
+        </section>
+
+        {/* Logout */}
+        <section className="mb-6">
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.href = "/login";
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-[18px] border border-red-400/15 bg-red-400/[0.04] px-5 py-4 text-[15px] font-medium text-red-400 transition hover:bg-red-400/[0.08]"
+          >
+            Sair da conta
+          </button>
         </section>
       </div>
 

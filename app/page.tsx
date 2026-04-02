@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { fetchWeather, reverseGeocode, searchCities } from "@/lib/weather";
 import { calculateFlightScore, getRiskNote } from "@/lib/score";
+import AuthGuard from "@/lib/AuthGuard";
 
 type Level = "good" | "warn" | "risk";
 type HourlyItem = { time: string; score: number; level: Level; label: string };
@@ -170,7 +171,7 @@ function HourlyCard({ item }: { item: HourlyItem }) {
 /* ═══════════════════════════════════════════ */
 /*                   HOME                      */
 /* ═══════════════════════════════════════════ */
-export default function Home() {
+function HomeContent() {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<any>(null);
   const [score, setScore] = useState(0);
@@ -428,4 +429,8 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+export default function Home() {
+  return <AuthGuard><HomeContent /></AuthGuard>;
 }
