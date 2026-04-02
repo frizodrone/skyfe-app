@@ -491,7 +491,7 @@ function ZonasMap() {
         document.head.appendChild(link);
       }
 
-      const L = (await import("leaflet")).default;
+      const L = (await import("leaflet")) as any;
       if (!mounted) return;
       LRef.current = L;
 
