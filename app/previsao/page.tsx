@@ -6,6 +6,7 @@ import {
   Sun, Clock3, Map, User, ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
+import { calculateFlightScore } from "@/lib/score";
 
 type Level = "good" | "warn" | "risk";
 
@@ -15,17 +16,7 @@ const LC: Record<Level, string> = {
   risk: "#ff5a5f",
 };
 
-function calcScore(wind: number, gust: number, rainProb: number, temp: number) {
-  let s = 100;
-  if (wind > 8) s -= Math.min(30, Math.round((wind - 8) * 1.5));
-  if (gust > 12) s -= Math.min(30, Math.round((gust - 12) * 1.2));
-  if (rainProb > 10) s -= Math.min(30, Math.round(rainProb * 0.4));
-  if (temp < 5) s -= 10;
-  if (temp > 38) s -= 10;
-  s = Math.max(0, Math.min(100, s));
-  const level: Level = s >= 75 ? "good" : s >= 50 ? "warn" : "risk";
-  return { score: s, level };
-}
+
 
 type HourItem = {
   time: string;
@@ -94,7 +85,7 @@ export default function Previsao() {
       const gust = weather.hourly.wind_gusts_10m?.[i] ?? 0;
       const rainP = weather.hourly.precipitation_probability?.[i] ?? 0;
       const temp = weather.hourly.temperature_2m?.[i] ?? 20;
-      const res = calcScore(wind, gust, rainP, temp);
+      const res = calculateFlightScore({ wind, gust, rainProb: rainP, temp });
       items.push({
         time: weather.hourly.time[i],
         hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
@@ -131,7 +122,7 @@ export default function Previsao() {
       const maxT = Math.round(weather.daily.temperature_2m_max?.[i] ?? 0);
       const avgT = (minT + maxT) / 2;
 
-      const res = calcScore(maxW, maxG, maxR, avgT);
+      const res = calculateFlightScore({ wind: maxW, gust: maxG, rainProb: maxR, temp: avgT });
 
       const dayHours: HourItem[] = [];
       if (weather.hourly?.time) {
@@ -142,7 +133,7 @@ export default function Previsao() {
             const hg = weather.hourly.wind_gusts_10m?.[h] ?? 0;
             const hr = weather.hourly.precipitation_probability?.[h] ?? 0;
             const ht = weather.hourly.temperature_2m?.[h] ?? 20;
-            const hres = calcScore(hw, hg, hr, ht);
+            const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht });
             dayHours.push({
               time: weather.hourly.time[h],
               hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),

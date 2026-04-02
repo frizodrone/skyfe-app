@@ -1,360 +1,503 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import { MapPin, Radio, AlertTriangle, Plane, Home, Info } from 'lucide-react';
-import Link from 'next/link';
-import type { LatLngExpression } from 'leaflet';
+import { useEffect, useState, useCallback, useMemo } from "react";
+import {
+  ArrowLeft,
+  Wind,
+  Zap,
+  CloudRain,
+  Thermometer,
+  Sun,
+  Clock3,
+  Map,
+  User,
+  ChevronDown,
+} from "lucide-react";
+import Link from "next/link";
+import { calculateFlightScore } from "@/lib/score";
 
-// Importar componentes do mapa dinamicamente (só no cliente)
-const MapContainer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.MapContainer),
-  { ssr: false }
-);
-const TileLayer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.TileLayer),
-  { ssr: false }
-);
-const Marker = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Marker),
-  { ssr: false }
-);
-const Popup = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Popup),
-  { ssr: false }
-);
-const Circle = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Circle),
-  { ssr: false }
-);
+type Level = "good" | "warn" | "risk";
 
-// Tipos de zonas
-interface Aeroporto {
-  id: string;
-  nome: string;
-  tipo: 'aeroporto' | 'heliporto';
-  lat: number;
-  lng: number;
-  raioRestricao: number;
-  descricao: string;
-}
+const LC: Record<Level, string> = {
+  good: "#2dffb3",
+  warn: "#ffd84d",
+  risk: "#ff5a5f",
+};
 
-interface ZonaRestrita {
-  id: string;
-  nome: string;
-  lat: number;
-  lng: number;
-  raio: number;
-  tipo: 'militar' | 'presidencial' | 'penitenciaria' | 'hospital';
-  descricao: string;
-}
+type HourItem = {
+  time: string;
+  hour: string;
+  score: number;
+  level: Level;
+  wind: number;
+  gust: number;
+  rainP: number;
+  temp: number;
+};
 
-export default function ZonasPage() {
-  const [userLocation, setUserLocation] = useState<LatLngExpression | null>(null);
-  const [showLegend, setShowLegend] = useState(true);
+type DayItem = {
+  date: string;
+  dayLabel: string;
+  avgScore: number;
+  level: Level;
+  minTemp: number;
+  maxTemp: number;
+  maxWind: number;
+  maxGust: number;
+  maxRain: number;
+  hours: HourItem[];
+};
 
-  // Aeroportos e helipontos de São Paulo
-  const aeroportos: Aeroporto[] = [
-    {
-      id: 'gru',
-      nome: 'Aeroporto Internacional de Guarulhos (GRU)',
-      tipo: 'aeroporto',
-      lat: -23.4356,
-      lng: -46.4731,
-      raioRestricao: 9000,
-      descricao: 'Maior aeroporto do Brasil. Proibido voos de drone em raio de 9km.',
-    },
-    {
-      id: 'cgh',
-      nome: 'Aeroporto de Congonhas (CGH)',
-      tipo: 'aeroporto',
-      lat: -23.6261,
-      lng: -46.6564,
-      raioRestricao: 9000,
-      descricao: 'Aeroporto doméstico. Proibido voos de drone em raio de 9km.',
-    },
-    {
-      id: 'sdm',
-      nome: 'Aeroporto Campo de Marte',
-      tipo: 'aeroporto',
-      lat: -23.5089,
-      lng: -46.6378,
-      raioRestricao: 5000,
-      descricao: 'Aeroporto executivo. Proibido voos de drone em raio de 5km.',
-    },
-    {
-      id: 'heli1',
-      nome: 'Heliporto Hospital das Clínicas',
-      tipo: 'heliporto',
-      lat: -23.5558,
-      lng: -46.6703,
-      raioRestricao: 1000,
-      descricao: 'Heliporto hospitalar. Evite voos em raio de 1km.',
-    },
-  ];
+export default function Previsao() {
+  const [loading, setLoading] = useState(true);
+  const [weather, setWeather] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"hours" | "days">("hours");
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
-  // Zonas de restrição especiais
-  const zonasRestritas: ZonaRestrita[] = [
-    {
-      id: 'palacio',
-      nome: 'Palácio dos Bandeirantes',
-      lat: -23.6153,
-      lng: -46.6978,
-      raio: 3000,
-      tipo: 'presidencial',
-      descricao: 'Sede do governo de SP. Zona de exclusão total para drones.',
-    },
-    {
-      id: 'militar1',
-      nome: 'Base Aérea de São Paulo',
-      lat: -23.6200,
-      lng: -46.6600,
-      raio: 2000,
-      tipo: 'militar',
-      descricao: 'Instalação militar. Proibido sobrevoo de drones.',
-    },
-  ];
+  const load = useCallback(async (lat: number, lon: number) => {
+    try {
+      const params = [
+        `latitude=${lat}`,
+        `longitude=${lon}`,
+        `hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability`,
+        `daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_gusts_10m_max,precipitation_probability_max`,
+        `forecast_days=16`,
+        `timezone=auto`,
+      ].join("&");
 
-  // Detectar localização do usuário
-  useEffect(() => {
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation([position.coords.latitude, position.coords.longitude]);
-        },
-        () => {
-          // Se falhar, usar centro de São Paulo
-          setUserLocation([-23.5505, -46.6333]);
-        }
-      );
-    } else {
-      setUserLocation([-23.5505, -46.6333]);
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+      const data = await res.json();
+      setWeather(data);
+    } catch {
+      // pode adicionar tratamento depois
     }
+    setLoading(false);
   }, []);
 
-  if (!userLocation) {
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      load(-23.55, -46.63);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => load(pos.coords.latitude, pos.coords.longitude),
+      () => load(-23.55, -46.63),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, [load]);
+
+  const hourlyItems: HourItem[] = useMemo(() => {
+    if (!weather?.hourly?.time) return [];
+
+    const now = new Date();
+    const items: HourItem[] = [];
+
+    for (let i = 0; i < weather.hourly.time.length && items.length < 24; i++) {
+      const t = new Date(weather.hourly.time[i]);
+      if (t < now) continue;
+
+      const wind = weather.hourly.wind_speed_10m?.[i] ?? 0;
+      const gust = weather.hourly.wind_gusts_10m?.[i] ?? 0;
+      const rainP = weather.hourly.precipitation_probability?.[i] ?? 0;
+      const temp = weather.hourly.temperature_2m?.[i] ?? 20;
+
+      const res = calculateFlightScore({
+        wind,
+        gust,
+        rainProb: rainP,
+        temp,
+      });
+
+      items.push({
+        time: weather.hourly.time[i],
+        hour: t.toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        score: res.score,
+        level: res.level,
+        wind: Math.round(wind),
+        gust: Math.round(gust),
+        rainP: Math.round(rainP),
+        temp: Math.round(temp),
+      });
+    }
+
+    return items;
+  }, [weather]);
+
+  const dailyItems: DayItem[] = useMemo(() => {
+    if (!weather?.daily?.time) return [];
+
+    const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const monthNames = [
+      "jan",
+      "fev",
+      "mar",
+      "abr",
+      "mai",
+      "jun",
+      "jul",
+      "ago",
+      "set",
+      "out",
+      "nov",
+      "dez",
+    ];
+
+    return weather.daily.time.map((dateStr: string, i: number) => {
+      const d = new Date(`${dateStr}T12:00:00`);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const isToday = d.toDateString() === today.toDateString();
+      const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+      const dayLabel = isToday
+        ? "Hoje"
+        : isTomorrow
+          ? "Amanhã"
+          : `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
+
+      const maxW = weather.daily.wind_speed_10m_max?.[i] ?? 0;
+      const maxG = weather.daily.wind_gusts_10m_max?.[i] ?? 0;
+      const maxR = weather.daily.precipitation_probability_max?.[i] ?? 0;
+      const minT = Math.round(weather.daily.temperature_2m_min?.[i] ?? 0);
+      const maxT = Math.round(weather.daily.temperature_2m_max?.[i] ?? 0);
+      const avgT = (minT + maxT) / 2;
+
+      const res = calculateFlightScore({
+        wind: maxW,
+        gust: maxG,
+        rainProb: maxR,
+        temp: avgT,
+      });
+
+      const dayHours: HourItem[] = [];
+
+      if (weather.hourly?.time) {
+        for (let h = 0; h < weather.hourly.time.length; h++) {
+          if (weather.hourly.time[h].startsWith(dateStr)) {
+            const t = new Date(weather.hourly.time[h]);
+            const hw = weather.hourly.wind_speed_10m?.[h] ?? 0;
+            const hg = weather.hourly.wind_gusts_10m?.[h] ?? 0;
+            const hr = weather.hourly.precipitation_probability?.[h] ?? 0;
+            const ht = weather.hourly.temperature_2m?.[h] ?? 20;
+
+            const hres = calculateFlightScore({
+              wind: hw,
+              gust: hg,
+              rainProb: hr,
+              temp: ht,
+            });
+
+            dayHours.push({
+              time: weather.hourly.time[h],
+              hour: t.toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              score: hres.score,
+              level: hres.level,
+              wind: Math.round(hw),
+              gust: Math.round(hg),
+              rainP: Math.round(hr),
+              temp: Math.round(ht),
+            });
+          }
+        }
+      }
+
+      return {
+        date: dateStr,
+        dayLabel,
+        avgScore: res.score,
+        level: res.level,
+        minTemp: minT,
+        maxTemp: maxT,
+        maxWind: Math.round(maxW),
+        maxGust: Math.round(maxG),
+        maxRain: Math.round(maxR),
+        hours: dayHours,
+      };
+    });
+  }, [weather]);
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#04090f] flex items-center justify-center">
-        <div className="text-cyan-400 flex items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
-          <span className="text-lg">Carregando mapa...</span>
+      <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 rounded-full border-[3px] border-white/[0.06] border-t-cyan-400 animate-spin-loader" />
+          <p className="text-[15px] text-slate-400">Carregando previsão...</p>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#04090f] pb-20">
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#04090f]/95 backdrop-blur-sm border-b border-cyan-900/30">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/30 glow-cyan">
-                <MapPin className="w-6 h-6 text-cyan-400" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Zonas de Voo</h1>
-                <p className="text-sm text-gray-400">Mapa de restrições aéreas</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowLegend(!showLegend)}
-              className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors"
-            >
-              <Info className="w-5 h-5 text-cyan-400" />
-            </button>
-          </div>
-        </div>
+    <main className="min-h-screen bg-[#04090f] text-white">
+      <div className="pointer-events-none fixed inset-0 opacity-80">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_34%)]" />
       </div>
 
-      {/* Mapa */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="relative rounded-2xl overflow-hidden border border-cyan-900/30 shadow-2xl" style={{ height: '70vh' }}>
-          <MapContainer
-            center={userLocation}
-            zoom={11}
-            style={{ height: '100%', width: '100%' }}
-            className="z-0"
+      <div className="relative z-10 mx-auto w-full max-w-md px-5 pb-28 pt-6">
+        <header className="mb-8 flex items-center gap-4">
+          <Link
+            href="/"
+            className="grid h-11 w-11 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]"
           >
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            />
+            <ArrowLeft size={18} />
+          </Link>
+          <h1 className="text-[24px] font-bold tracking-tight">Previsão completa</h1>
+        </header>
 
-            {/* Marcador da localização do usuário */}
-            <Marker position={userLocation}>
-              <Popup>
-                <div className="text-center p-2">
-                  <p className="font-semibold text-cyan-600">📍 Você está aqui</p>
-                </div>
-              </Popup>
-            </Marker>
+        <div className="mb-8 flex gap-3">
+          <button
+            onClick={() => setActiveTab("hours")}
+            className="flex-1 rounded-2xl py-3.5 text-[15px] font-semibold transition-all duration-200"
+            style={
+              activeTab === "hours"
+                ? {
+                    background:
+                      "linear-gradient(135deg, rgba(45,204,255,0.15) 0%, rgba(45,255,179,0.1) 100%)",
+                    border: "1px solid rgba(45,204,255,0.3)",
+                    color: "#2dccff",
+                    boxShadow: "0 0 20px rgba(45,204,255,0.1)",
+                  }
+                : {
+                    background: "rgba(255,255,255,0.025)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    color: "#64748b",
+                  }
+            }
+          >
+            Próximas 24h
+          </button>
 
-            {/* Aeroportos e helipontos */}
-            {aeroportos.map((aeroporto) => (
-              <div key={aeroporto.id}>
-                <Circle
-                  center={[aeroporto.lat, aeroporto.lng]}
-                  radius={aeroporto.raioRestricao}
-                  pathOptions={{
-                    color: aeroporto.tipo === 'aeroporto' ? '#ef4444' : '#f97316',
-                    fillColor: aeroporto.tipo === 'aeroporto' ? '#ef4444' : '#f97316',
-                    fillOpacity: 0.15,
-                    weight: 2,
-                  }}
-                />
-                <Marker position={[aeroporto.lat, aeroporto.lng]}>
-                  <Popup>
-                    <div className="min-w-[200px] p-2">
-                      <div className="flex items-center gap-2 mb-2">
-                        {aeroporto.tipo === 'aeroporto' ? (
-                          <span className="text-lg">✈️</span>
-                        ) : (
-                          <span className="text-lg">🚁</span>
-                        )}
-                        <h3 className="font-bold text-sm">{aeroporto.nome}</h3>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-2">{aeroporto.descricao}</p>
-                      <div className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
-                        Raio de restrição: {(aeroporto.raioRestricao / 1000).toFixed(1)}km
-                      </div>
-                    </div>
-                  </Popup>
-                </Marker>
-              </div>
-            ))}
-
-            {/* Zonas de restrição especiais */}
-            {zonasRestritas.map((zona) => (
-              <div key={zona.id}>
-                <Circle
-                  center={[zona.lat, zona.lng]}
-                  radius={zona.raio}
-                  pathOptions={{
-                    color: '#dc2626',
-                    fillColor: '#dc2626',
-                    fillOpacity: 0.25,
-                    weight: 3,
-                    dashArray: '10, 10',
-                  }}
-                />
-                <Marker position={[zona.lat, zona.lng]}>
-                  <Popup>
-                    <div className="min-w-[200px] p-2">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">⚠️</span>
-                        <h3 className="font-bold text-sm">{zona.nome}</h3>
-                      </div>
-                      <div className="text-xs bg-red-50 text-red-800 px-2 py-1 rounded mb-2 capitalize">
-                        Tipo: {zona.tipo}
-                      </div>
-                      <p className="text-xs text-gray-600 mb-2">{zona.descricao}</p>
-                      <div className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
-                        Raio de exclusão: {(zona.raio / 1000).toFixed(1)}km
-                      </div>
-                    </div>
-                  </Popup>
-                </Marker>
-              </div>
-            ))}
-          </MapContainer>
-
-          {/* Legenda */}
-          {showLegend && (
-            <div className="absolute bottom-4 right-4 bg-[#04090f]/95 backdrop-blur-sm border border-cyan-900/30 rounded-xl p-4 shadow-2xl z-[1000] max-w-xs">
-              <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                <Info className="w-4 h-4 text-cyan-400" />
-                Legenda
-              </h3>
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-red-500/30 border-2 border-red-500"></div>
-                  <span className="text-gray-300">Aeroporto (9km restrição)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-orange-500/30 border-2 border-orange-500"></div>
-                  <span className="text-gray-300">Heliporto (1km restrição)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-red-600/40 border-2 border-red-600 border-dashed"></div>
-                  <span className="text-gray-300">Zona de exclusão total</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-base">📍</span>
-                  <span className="text-gray-300">Sua localização</span>
-                </div>
-              </div>
-            </div>
-          )}
+          <button
+            onClick={() => setActiveTab("days")}
+            className="flex-1 rounded-2xl py-3.5 text-[15px] font-semibold transition-all duration-200"
+            style={
+              activeTab === "days"
+                ? {
+                    background:
+                      "linear-gradient(135deg, rgba(45,204,255,0.15) 0%, rgba(45,255,179,0.1) 100%)",
+                    border: "1px solid rgba(45,204,255,0.3)",
+                    color: "#2dccff",
+                    boxShadow: "0 0 20px rgba(45,204,255,0.1)",
+                  }
+                : {
+                    background: "rgba(255,255,255,0.025)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    color: "#64748b",
+                  }
+            }
+          >
+            16 dias
+          </button>
         </div>
 
-        {/* Cards de Avisos */}
-        <div className="grid md:grid-cols-2 gap-4 mt-6">
-          {/* Aviso Legal */}
-          <div className="bg-gradient-to-br from-cyan-950/30 to-blue-950/30 rounded-xl p-6 border border-cyan-900/30">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-cyan-500/10 rounded-lg">
-                <AlertTriangle className="w-5 h-5 text-cyan-400" />
-              </div>
-              <div>
-                <h3 className="text-white font-semibold mb-2">Aviso Legal</h3>
-                <p className="text-sm text-gray-400 leading-relaxed">
-                  Este mapa é apenas informativo. Sempre consulte o DECEA e as autoridades locais antes de voar. 
-                  Respeite as zonas de restrição e as regras da ANAC.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Dicas de Segurança */}
-          <div className="bg-gradient-to-br from-emerald-950/30 to-green-950/30 rounded-xl p-6 border border-emerald-900/30">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-emerald-500/10 rounded-lg">
-                <Info className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                <h3 className="text-white font-semibold mb-2">Dicas de Segurança</h3>
-                <ul className="text-sm text-gray-400 space-y-1">
-                  <li>• Mantenha distância mínima de 5km de aeroportos</li>
-                  <li>• Respeite altura máxima de 120m (400ft)</li>
-                  <li>• Voe apenas com visibilidade direta</li>
-                </ul>
-              </div>
-            </div>
-          </div>
+        <div className="mb-8 flex items-center gap-4 text-[12px]">
+          <span className="flex items-center gap-1.5 text-slate-500">
+            <span className="h-[9px] w-[9px] rounded-full bg-[#2dffb3]" /> Seguro
+          </span>
+          <span className="flex items-center gap-1.5 text-slate-500">
+            <span className="h-[9px] w-[9px] rounded-full bg-[#ffd84d]" /> Cuidado
+          </span>
+          <span className="flex items-center gap-1.5 text-slate-500">
+            <span className="h-[9px] w-[9px] rounded-full bg-[#ff5a5f]" /> Risco
+          </span>
         </div>
+
+        {activeTab === "hours" && (
+          <div className="flex flex-col gap-3">
+            {hourlyItems.map((h) => (
+              <div
+                key={h.time}
+                className="relative flex items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4 transition-all duration-200"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)",
+                  border: `1px solid ${LC[h.level]}18`,
+                  boxShadow: `0 0 12px ${LC[h.level]}06`,
+                }}
+              >
+                <div
+                  className="absolute bottom-2 left-0 top-2 w-[3px] rounded-full"
+                  style={{ background: LC[h.level], opacity: 0.6 }}
+                />
+
+                <div
+                  className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
+                  style={{
+                    background: `${LC[h.level]}10`,
+                    border: `1px solid ${LC[h.level]}20`,
+                  }}
+                >
+                  <span className="text-[16px] font-bold" style={{ color: LC[h.level] }}>
+                    {h.score}
+                  </span>
+                </div>
+
+                <div className="flex-1">
+                  <p className="text-[16px] font-semibold text-slate-100">{h.hour}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-500">
+                    <span className="inline-flex items-center gap-1">
+                      <Wind size={11} />
+                      {h.wind} km/h
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Zap size={11} />
+                      {h.gust}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <CloudRain size={11} />
+                      {h.rainP}%
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Thermometer size={11} />
+                      {h.temp}°
+                    </span>
+                  </div>
+                </div>
+
+                <span
+                  className="h-[12px] w-[12px] shrink-0 rounded-full"
+                  style={{
+                    background: LC[h.level],
+                    boxShadow: `0 0 10px ${LC[h.level]}44`,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === "days" && (
+          <div className="flex flex-col gap-3">
+            {dailyItems.map((day) => (
+              <div key={day.date}>
+                <button
+                  onClick={() =>
+                    setExpandedDay(expandedDay === day.date ? null : day.date)
+                  }
+                  className="relative flex w-full items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4 text-left transition-all duration-200"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)",
+                    border: `1px solid ${LC[day.level]}18`,
+                    boxShadow: `0 0 12px ${LC[day.level]}06`,
+                  }}
+                >
+                  <div
+                    className="absolute bottom-2 left-0 top-2 w-[3px] rounded-full"
+                    style={{ background: LC[day.level], opacity: 0.6 }}
+                  />
+
+                  <div
+                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
+                    style={{
+                      background: `${LC[day.level]}10`,
+                      border: `1px solid ${LC[day.level]}20`,
+                    }}
+                  >
+                    <span className="text-[16px] font-bold" style={{ color: LC[day.level] }}>
+                      {day.avgScore}
+                    </span>
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="text-[16px] font-semibold text-slate-100">
+                      {day.dayLabel}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-500">
+                      <span>
+                        {day.minTemp}°–{day.maxTemp}°
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Wind size={11} />
+                        {day.maxWind}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <CloudRain size={11} />
+                        {day.maxRain}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <ChevronDown
+                    size={18}
+                    className={`shrink-0 text-slate-500 transition-transform duration-200 ${
+                      expandedDay === day.date ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {expandedDay === day.date && day.hours.length > 0 && (
+                  <div className="ml-2 mr-2 mt-2 rounded-2xl border border-white/[0.04] bg-white/[0.02] p-3">
+                    <div className="flex flex-col gap-2">
+                      {day.hours.map((h) => (
+                        <div
+                          key={h.time}
+                          className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                          style={{ background: `${LC[h.level]}06` }}
+                        >
+                          <span
+                            className="h-[9px] w-[9px] shrink-0 rounded-full"
+                            style={{ background: LC[h.level] }}
+                          />
+                          <span className="w-[50px] text-[13px] font-medium text-slate-200">
+                            {h.hour}
+                          </span>
+                          <span
+                            className="w-[32px] text-[14px] font-bold"
+                            style={{ color: LC[h.level] }}
+                          >
+                            {h.score}
+                          </span>
+                          <span className="flex-1 text-[11px] text-slate-500">
+                            {h.wind}km/h · {h.rainP}% · {h.temp}°
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#04090f]/95 backdrop-blur-sm border-t border-cyan-900/30 z-50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-5 gap-2 py-3">
-            <Link href="/" className="flex flex-col items-center gap-1 text-gray-400 hover:text-cyan-400 transition-colors">
-              <Home className="w-5 h-5" />
-              <span className="text-xs">Home</span>
-            </Link>
-            <Link href="/previsao" className="flex flex-col items-center gap-1 text-gray-400 hover:text-cyan-400 transition-colors">
-              <Radio className="w-5 h-5" />
-              <span className="text-xs">Previsão</span>
-            </Link>
-            <Link href="/zonas" className="flex flex-col items-center gap-1 text-cyan-400">
-              <div className="p-2 bg-cyan-500/20 rounded-lg -mt-2">
-                <MapPin className="w-5 h-5" />
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">
+        <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">
+          {[
+            { icon: <Sun size={21} />, label: "Clima", href: "/", active: false },
+            { icon: <Map size={21} />, label: "Zonas", href: "/zonas", active: false },
+            { icon: <Clock3 size={21} />, label: "Previsão", href: "/previsao", active: true },
+            { icon: <User size={21} />, label: "Perfil", href: "/perfil", active: false },
+          ].map((tab) => (
+            <Link
+              key={tab.label}
+              href={tab.href}
+              className={`flex flex-col items-center gap-1 transition ${
+                tab.active ? "text-cyan-400" : "text-slate-500"
+              }`}
+            >
+              <div
+                className={`grid h-8 w-12 place-items-center rounded-xl transition ${
+                  tab.active ? "bg-cyan-400/[0.1]" : ""
+                }`}
+              >
+                {tab.icon}
               </div>
-              <span className="text-xs font-semibold">Zonas</span>
+              <span className={tab.active ? "font-semibold" : ""}>{tab.label}</span>
             </Link>
-            <Link href="/analise" className="flex flex-col items-center gap-1 text-gray-400 hover:text-cyan-400 transition-colors">
-              <AlertTriangle className="w-5 h-5" />
-              <span className="text-xs">Análise</span>
-            </Link>
-            <Link href="/perfil" className="flex flex-col items-center gap-1 text-gray-400 hover:text-cyan-400 transition-colors">
-              <Plane className="w-5 h-5" />
-              <span className="text-xs">Perfil</span>
-            </Link>
-          </div>
+          ))}
         </div>
       </nav>
-    </div>
+    </main>
   );
 }
