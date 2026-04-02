@@ -266,7 +266,7 @@ export default function Home() {
 
       {showSearch && <SearchModal onSelect={handleSearchSelect} onClose={() => setShowSearch(false)} />}
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-5 pb-28 pt-6">
+      <div className="relative z-10 mx-auto w-full max-w-md px-5 pb-28 pt-6">
         {/* ─── Header ─── */}
         <header className="mb-6 flex items-center justify-between">
           <div className="grid h-12 w-12 place-items-center rounded-[20px] border border-cyan-400/[0.12] bg-white/[0.03]">
@@ -385,12 +385,9 @@ export default function Home() {
           )}
         </section>
 
-        {/* spacer to push CTA down */}
-        <div className="flex-1 min-h-[20px]" />
-
         {/* ─── CTA Button ─── */}
         <a href="/analise"
-          className="mb-4 block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
+          className="mb-6 block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
           Ver análise detalhada
         </a>
 
