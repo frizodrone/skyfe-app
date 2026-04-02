@@ -105,23 +105,24 @@ function MetricCard({ icon, title, value, unit, note, level }: {
   const color = LC[level];
   return (
     <div
-      className="metric-card-v2 relative flex min-h-[160px] flex-col overflow-hidden rounded-[20px] px-3 py-4 text-center transition-all duration-300"
+      className="relative flex min-h-[150px] flex-col overflow-hidden rounded-[18px] px-2.5 py-3.5 text-center transition-all duration-300"
       style={{
-        background: `linear-gradient(168deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.015) 100%)`,
-        border: `1px solid ${color}25`,
-        boxShadow: `0 0 20px ${color}08, inset 0 1px 0 rgba(255,255,255,0.04)`,
+        background: `linear-gradient(168deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 100%)`,
+        border: `1px solid ${color}20`,
+        boxShadow: `0 0 18px ${color}06, inset 0 1px 0 rgba(255,255,255,0.03)`,
       }}
     >
-      {/* glow accent top */}
-      <div className="absolute -top-4 left-1/2 h-8 w-16 -translate-x-1/2 rounded-full opacity-40 blur-xl" style={{ background: color }} />
-      <div className="relative z-10 mb-2.5 flex justify-center" style={{ color }}>
+      {/* subtle top glow */}
+      <div className="absolute -top-3 left-1/2 h-6 w-10 -translate-x-1/2 rounded-full opacity-35 blur-lg" style={{ background: color }} />
+
+      <div className="relative z-10 mb-2 flex justify-center" style={{ color }}>
         {icon}
       </div>
-      <p className="relative z-10 min-h-[28px] whitespace-pre-line text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-400">{title}</p>
+      <p className="relative z-10 min-h-[26px] whitespace-pre-line text-[9px] uppercase leading-tight tracking-[0.1em] text-slate-500">{title}</p>
       <div className="relative z-10 mt-auto flex flex-1 flex-col items-center justify-center">
-        <p className="text-[26px] font-bold leading-none tracking-tight text-white" style={{ textShadow: `0 0 16px ${color}18` }}>{value}</p>
+        <p className="text-[24px] font-semibold leading-none tracking-tight text-white">{value}</p>
         {unit && <p className="mt-1 text-[11px] text-slate-500">{unit}</p>}
-        <p className="mt-2 text-[10px] font-medium" style={{ color: `${color}bb` }}>{note}</p>
+        <p className="mt-1.5 text-[10px] font-medium" style={{ color: `${color}bb` }}>{note}</p>
       </div>
     </div>
   );
@@ -132,19 +133,19 @@ function HourlyCard({ item }: { item: HourlyItem }) {
   const color = LC[item.level];
   return (
     <div
-      className="flex flex-shrink-0 flex-col items-center gap-2 rounded-2xl px-4 py-3.5 transition-all duration-200"
+      className="flex flex-shrink-0 flex-col items-center gap-2.5 rounded-2xl px-5 py-4 transition-all duration-200"
       style={{
-        background: `linear-gradient(180deg, ${color}08 0%, transparent 100%)`,
-        border: `1px solid ${color}20`,
-        minWidth: "72px",
+        background: `linear-gradient(180deg, ${color}0a 0%, transparent 100%)`,
+        border: `1px solid ${color}1a`,
+        minWidth: "80px",
       }}
     >
       <span
-        className="h-[11px] w-[11px] rounded-full"
-        style={{ background: color, boxShadow: `0 0 10px ${color}44` }}
+        className="h-[12px] w-[12px] rounded-full"
+        style={{ background: color, boxShadow: `0 0 12px ${color}55` }}
       />
-      <span className="text-[14px] font-semibold text-slate-100">{item.time}</span>
-      <span className="text-[10px] font-medium" style={{ color: `${color}cc` }}>
+      <span className="text-[15px] font-semibold text-slate-100">{item.time}</span>
+      <span className="text-[11px] font-medium" style={{ color: `${color}cc` }}>
         {item.level === "good" ? "Seguro" : item.level === "warn" ? "Cuidado" : "Risco"}
       </span>
     </div>
