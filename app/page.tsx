@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Search, Settings, Wind, Zap, CloudRain, Thermometer,
-  Sun, Map, Clock3, User, Eye, Droplets, MapPin, LocateFixed, X,
+  Sun, Map, Clock3, User, Eye, Droplets, MapPin, LocateFixed, X, Star,
 } from "lucide-react";
 import { fetchWeather, reverseGeocode, searchCities } from "@/lib/weather";
 import { calculateFlightScore, getRiskNote } from "@/lib/score";
 import AuthGuard from "@/lib/AuthGuard";
+import { supabase } from "@/lib/supabase";
 
 type Level = "good" | "warn" | "risk";
 type HourlyItem = { time: string; score: number; level: Level; label: string };
@@ -22,8 +23,25 @@ function SearchModal({ onSelect, onClose }: { onSelect: (r: any) => void; onClos
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const [favorites, setFavorites] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // Load favorites
+  useEffect(() => {
+    const loadFavs = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("favorites")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (data) setFavorites(data);
+    };
+    loadFavs();
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(async () => {
       if (query.length < 2) { setResults([]); return; }
@@ -53,6 +71,24 @@ function SearchModal({ onSelect, onClose }: { onSelect: (r: any) => void; onClos
         <LocateFixed size={18} className="text-cyan-400" />
         <span className="text-[15px] font-medium text-cyan-400">Usar minha localização</span>
       </button>
+
+      {/* Favorites */}
+      {!query && favorites.length > 0 && (
+        <div className="mb-3">
+          <p className="px-2 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Locais favoritos</p>
+          {favorites.map((fav: any) => (
+            <button key={fav.id} onClick={() => {
+              onSelect({ name: fav.name, latitude: fav.latitude, longitude: fav.longitude, id: fav.id });
+              onClose();
+            }}
+              className="flex w-full items-center gap-3 border-b border-white/[0.04] px-4 py-3 text-left">
+              <Star size={14} className="fill-amber-400 text-amber-400 shrink-0" />
+              <span className="text-[15px] font-medium text-white">{fav.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {searching && <p className="px-2 py-2 text-sm text-slate-500">Buscando...</p>}
       <div className="flex-1 overflow-y-auto">
         {results.map((r: any) => (
@@ -180,20 +216,72 @@ function HomeContent() {
   const [placeName, setPlaceName] = useState("Detectando...");
   const [showSearch, setShowSearch] = useState(false);
   const [error, setError] = useState("");
+  const [currentLat, setCurrentLat] = useState(-23.55);
+  const [currentLon, setCurrentLon] = useState(-46.63);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [savingFav, setSavingFav] = useState(false);
 
   const loadWeather = useCallback(async (lat: number, lon: number, name?: string) => {
     setLoading(true); setError("");
+    setCurrentLat(lat); setCurrentLon(lon);
     try {
       const data = await fetchWeather(lat, lon);
       setWeather(data);
       const c = data.current;
       const rp = data.hourly?.precipitation_probability?.[0] ?? 0;
-      const res = calculateFlightScore({ wind: c.wind_speed_10m, gust: c.wind_gusts_10m, rainProb: rp, temp: c.temperature_2m });
+      // If actually raining, use 100% as rain probability for score
+      const effectiveRain = (c.precipitation ?? 0) > 0 ? Math.max(rp, 80) : rp;
+      const res = calculateFlightScore({ wind: c.wind_speed_10m, gust: c.wind_gusts_10m, rainProb: effectiveRain, temp: c.temperature_2m });
       setScore(res.score); setLabel(res.label); setLevel(res.level);
       if (name) { setPlaceName(name); } else { const geo = await reverseGeocode(lat, lon); setPlaceName(geo); }
+      // Check if this location is a favorite
+      checkFavorite(lat, lon);
     } catch { setError("Erro ao carregar clima."); }
     setLoading(false);
   }, []);
+
+  const checkFavorite = async (lat: number, lon: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("favorites")
+        .select("id")
+        .eq("user_id", user.id)
+        .gte("latitude", lat - 0.01)
+        .lte("latitude", lat + 0.01)
+        .gte("longitude", lon - 0.01)
+        .lte("longitude", lon + 0.01)
+        .limit(1);
+      setIsFavorite((data?.length ?? 0) > 0);
+    } catch { /* silent */ }
+  };
+
+  const toggleFavorite = async () => {
+    setSavingFav(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (isFavorite) {
+        await supabase
+          .from("favorites")
+          .delete()
+          .eq("user_id", user.id)
+          .gte("latitude", currentLat - 0.01)
+          .lte("latitude", currentLat + 0.01)
+          .gte("longitude", currentLon - 0.01)
+          .lte("longitude", currentLon + 0.01);
+        setIsFavorite(false);
+      } else {
+        await supabase
+          .from("favorites")
+          .insert({ user_id: user.id, name: placeName, latitude: currentLat, longitude: currentLon });
+        setIsFavorite(true);
+      }
+    } catch { /* silent */ }
+    setSavingFav(false);
+  };
 
   const loadFromGeo = useCallback(() => {
     if (!navigator.geolocation) { loadWeather(-23.55, -46.63, "São Paulo, BR"); return; }
@@ -242,7 +330,16 @@ function HomeContent() {
   const wind = weather ? Math.round(weather.current.wind_speed_10m) : 0;
   const gust = weather ? Math.round(weather.current.wind_gusts_10m) : 0;
   const rainP = weather ? (weather.hourly?.precipitation_probability?.[0] ?? 0) : 0;
+  const rainNow = weather ? (weather.current.precipitation ?? 0) : 0;
   const temp = weather ? Math.round(weather.current.temperature_2m) : 0;
+
+  // Use real precipitation if raining, otherwise use probability
+  const rainDisplay = rainNow > 0 ? `${rainNow.toFixed(1)}mm` : `${rainP}%`;
+  const rainTitle = rainNow > 0 ? "CHUVA\nAGORA" : "CHUVA\nPROB.";
+  const rainUnit = rainNow > 0 ? "agora" : "";
+  // Rain risk: if actually raining, it's always risk. Otherwise use probability
+  const rainRiskVal = rainNow > 0 ? 100 : rainP;
+  const rainNote = rainNow > 0 ? `Chovendo (${rainP}% prob.)` : getRiskNote("rain", rainP);
 
   /* ── per-metric risk level ── */
   function getMetricLevel(type: string, val: number): Level {
@@ -256,7 +353,7 @@ function HomeContent() {
   const metrics = [
     { icon: <Wind size={20} />, title: "VENTO\nMÉDIO", value: weather ? `${wind}` : "--", unit: "km/h", note: getRiskNote("wind", wind), metricLevel: getMetricLevel("wind", wind) },
     { icon: <Zap size={20} />, title: "RAJADA\nMÁX", value: weather ? `${gust}` : "--", unit: "km/h", note: getRiskNote("gust", gust), metricLevel: getMetricLevel("gust", gust) },
-    { icon: <CloudRain size={20} />, title: "CHUVA", value: weather ? `${rainP}%` : "--", unit: "", note: getRiskNote("rain", rainP), metricLevel: getMetricLevel("rain", rainP) },
+    { icon: <CloudRain size={20} />, title: rainTitle, value: weather ? rainDisplay : "--", unit: rainUnit, note: rainNote, metricLevel: getMetricLevel("rain", rainRiskVal) },
     { icon: <Thermometer size={20} />, title: "TEMP", value: weather ? `${temp}°` : "--", unit: "", note: getRiskNote("temp", temp), metricLevel: getMetricLevel("temp", temp) },
   ];
 
@@ -307,7 +404,13 @@ function HomeContent() {
 
         {/* ─── Location ─── */}
         <div className="mb-8 text-center">
-          <p className="inline-flex items-center gap-1.5 text-[17px] font-medium text-slate-100">{placeName} <MapPin size={14} className="text-cyan-400" /></p>
+          <div className="inline-flex items-center gap-2">
+            <p className="inline-flex items-center gap-1.5 text-[17px] font-medium text-slate-100">{placeName} <MapPin size={14} className="text-cyan-400" /></p>
+            <button onClick={toggleFavorite} disabled={savingFav}
+              className="transition hover:scale-110 disabled:opacity-50">
+              <Star size={16} className={isFavorite ? "fill-amber-400 text-amber-400" : "text-slate-600"} />
+            </button>
+          </div>
           <p className="mt-1 text-[12px] text-slate-500">dados em tempo real</p>
         </div>
 
@@ -366,7 +469,7 @@ function HomeContent() {
             {/* quick summary */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-[13px] text-slate-300">
               <span className="inline-flex items-center gap-1.5"><Wind size={13} className="text-slate-400" />{wind <= 15 ? "Vento ideal" : "Vento forte"}</span>
-              <span className="inline-flex items-center gap-1.5"><Droplets size={13} className="text-slate-400" />{rainP <= 20 ? "Sem chuva" : "Chuva provável"}</span>
+              <span className="inline-flex items-center gap-1.5"><Droplets size={13} className="text-slate-400" />{rainNow > 0 ? "Chovendo agora" : rainP <= 20 ? "Sem chuva" : "Chuva provável"}</span>
               <span className="inline-flex items-center gap-1.5"><Eye size={13} className="text-slate-400" />Boa visibilidade</span>
             </div>
           </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Sun, Map, Clock3, User, Settings, Shield, Globe, Info,
-  Edit3, Save, ChevronDown,
+  Edit3, Save, ChevronDown, Star, Trash2, MapPin,
 } from "lucide-react";
 import Link from "next/link";
 import AuthGuard from "@/lib/AuthGuard";
@@ -79,6 +79,7 @@ function Perfil() {
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [favorites, setFavorites] = useState<any[]>([]);
   const [droneOpen, setDroneOpen] = useState(false);
   const [expOpen, setExpOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -105,6 +106,15 @@ function Perfil() {
       } else {
         setEditing(true);
       }
+
+      // Load favorites
+      const { data: favs } = await supabase
+        .from("favorites")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (favs) setFavorites(favs);
+
       setLoading(false);
     };
     loadFromDB();
@@ -275,6 +285,38 @@ function Perfil() {
               className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-4 text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed">
               <Save size={17} /> Salvar perfil
             </button>
+          </section>
+        )}
+
+        {/* Favorites */}
+        {favorites.length > 0 && (
+          <section className="mb-8">
+            <h3 className="mb-4 text-[16px] font-semibold text-slate-300">Locais favoritos</h3>
+            <div className="flex flex-col gap-2.5">
+              {favorites.map((fav: any) => (
+                <div key={fav.id}
+                  className="flex items-center gap-3 rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-4 transition hover:bg-white/[0.04]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400/10">
+                    <Star size={16} className="fill-amber-400 text-amber-400" />
+                  </div>
+                  <Link href={`/?lat=${fav.latitude}&lon=${fav.longitude}&name=${encodeURIComponent(fav.name)}`} className="flex-1">
+                    <p className="text-[15px] font-medium text-slate-200">{fav.name}</p>
+                    <p className="mt-0.5 text-[12px] text-slate-500">
+                      <MapPin size={10} className="inline mr-1" />
+                      {fav.latitude.toFixed(2)}, {fav.longitude.toFixed(2)}
+                    </p>
+                  </Link>
+                  <button
+                    onClick={async () => {
+                      await supabase.from("favorites").delete().eq("id", fav.id);
+                      setFavorites(favorites.filter((f: any) => f.id !== fav.id));
+                    }}
+                    className="grid h-9 w-9 place-items-center rounded-xl text-slate-600 transition hover:bg-red-400/10 hover:text-red-400">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 

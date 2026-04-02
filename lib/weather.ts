@@ -7,12 +7,15 @@ export type WeatherData = {
     wind_speed_10m: number;
     wind_gusts_10m: number;
     precipitation: number;
+    rain: number;
+    cloud_cover: number;
   };
   hourly: {
     time: string[];
     wind_speed_10m: number[];
     wind_gusts_10m: number[];
     precipitation_probability: number[];
+    precipitation: number[];
     temperature_2m: number[];
   };
 };
@@ -24,8 +27,8 @@ export async function fetchWeather(
   const params = [
     `latitude=${lat}`,
     `longitude=${lon}`,
-    `current=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation`,
-    `hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability`,
+    `current=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation,rain,cloud_cover`,
+    `hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability,precipitation`,
     `forecast_days=2`,
     `timezone=auto`,
   ].join("&");
