@@ -312,7 +312,22 @@ export default function Home() {
 
         {error && <div className="mb-4 rounded-2xl border border-red-400/15 bg-red-400/[0.06] px-4 py-3 text-[14px] text-red-200">{error}</div>}
 
-        {/* ─── Score / Radar Section (v2 — refined frame) ─── */}
+        {/* ─── Metric Cards (PRIMEIRO) ─── */}
+        <section className="mb-6 grid grid-cols-4 gap-3">
+          {metrics.map((m) => (
+            <MetricCard
+              key={m.title}
+              icon={m.icon}
+              title={m.title}
+              value={m.value}
+              unit={m.unit}
+              note={m.note}
+              level={m.metricLevel}
+            />
+          ))}
+        </section>
+
+        {/* ─── Score / Radar Section ─── */}
         <section className="relative mb-10 overflow-hidden rounded-[28px] border border-cyan-400/[0.12] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] px-5 py-8 shadow-[0_0_50px_rgba(45,204,255,0.06)]">
           {/* double border glow */}
           <div className="pointer-events-none absolute inset-0 rounded-[28px] border border-cyan-400/[0.06]" style={{ margin: "3px" }} />
@@ -354,21 +369,6 @@ export default function Home() {
               <span className="inline-flex items-center gap-1.5"><Eye size={13} className="text-slate-400" />Boa visibilidade</span>
             </div>
           </div>
-        </section>
-
-        {/* ─── Metric Cards v2 (with glow borders) ─── */}
-        <section className="mb-10 grid grid-cols-4 gap-3">
-          {metrics.map((m) => (
-            <MetricCard
-              key={m.title}
-              icon={m.icon}
-              title={m.title}
-              value={m.value}
-              unit={m.unit}
-              note={m.note}
-              level={m.metricLevel}
-            />
-          ))}
         </section>
 
         {/* ─── Hourly Forecast v2 (mini cards, horizontal scroll) ─── */}
