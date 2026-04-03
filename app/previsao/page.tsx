@@ -277,6 +277,7 @@ function Previsao() {
                     <span className="inline-flex items-center gap-1"><Zap size={11} />{h.gust}</span>
                     <span className="inline-flex items-center gap-1"><CloudRain size={11} />{h.rainP}%</span>
                     <span className="inline-flex items-center gap-1"><Thermometer size={11} />{h.temp}°</span>
+                    <span className="inline-flex items-center gap-1"><Activity size={11} />Kp {kpValue.toFixed(1)}</span>
                   </div>
                 </div>
 
@@ -344,7 +345,7 @@ function Previsao() {
                           <span className="w-[50px] text-[13px] font-medium text-slate-200">{h.hour}</span>
                           <span className="w-[32px] text-[14px] font-bold" style={{ color: LC[h.level] }}>{h.score}</span>
                           <span className="flex-1 text-[11px] text-slate-500">
-                            {h.wind}km/h · {h.rainP}% · {h.temp}°
+                            {h.wind}km/h · {h.rainP}% · {h.temp}° · Kp {kpValue.toFixed(1)}
                           </span>
                         </div>
                       ))}
