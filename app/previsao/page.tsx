@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
-  ArrowLeft, Wind, Zap, CloudRain, Thermometer,
+  ArrowLeft, Wind, Zap, CloudRain, Thermometer, Activity,
   Sun, Clock3, Map, User, ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { calculateFlightScore } from "@/lib/score";
+import { fetchKpIndex } from "@/lib/weather";
 import AuthGuard from "@/lib/AuthGuard";
 
 type Level = "good" | "warn" | "risk";
@@ -50,6 +51,7 @@ export default function PrevisaoWrapper() {
 function Previsao() {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<any>(null);
+  const [kpValue, setKpValue] = useState(0);
   const [activeTab, setActiveTab] = useState<"hours" | "days">("hours");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
@@ -66,6 +68,8 @@ function Previsao() {
       const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
       const data = await res.json();
       setWeather(data);
+      const kpData = await fetchKpIndex();
+      setKpValue(kpData.kp);
     } catch {}
     setLoading(false);
   }, []);
@@ -90,7 +94,7 @@ function Previsao() {
       const gust = weather.hourly.wind_gusts_10m?.[i] ?? 0;
       const rainP = weather.hourly.precipitation_probability?.[i] ?? 0;
       const temp = weather.hourly.temperature_2m?.[i] ?? 20;
-      const res = calculateFlightScore({ wind, gust, rainProb: rainP, temp });
+      const res = calculateFlightScore({ wind, gust, rainProb: rainP, temp, kp: kpValue });
       items.push({
         time: weather.hourly.time[i],
         hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
@@ -103,7 +107,7 @@ function Previsao() {
       });
     }
     return items;
-  }, [weather]);
+  }, [weather, kpValue]);
 
   const dailyItems: DayItem[] = useMemo(() => {
     if (!weather?.daily?.time) return [];
@@ -127,7 +131,7 @@ function Previsao() {
       const maxT = Math.round(weather.daily.temperature_2m_max?.[i] ?? 0);
       const avgT = (minT + maxT) / 2;
 
-      const res = calculateFlightScore({ wind: maxW, gust: maxG, rainProb: maxR, temp: avgT });
+      const res = calculateFlightScore({ wind: maxW, gust: maxG, rainProb: maxR, temp: avgT, kp: kpValue });
 
       const dayHours: HourItem[] = [];
       if (weather.hourly?.time) {
@@ -138,7 +142,7 @@ function Previsao() {
             const hg = weather.hourly.wind_gusts_10m?.[h] ?? 0;
             const hr = weather.hourly.precipitation_probability?.[h] ?? 0;
             const ht = weather.hourly.temperature_2m?.[h] ?? 20;
-            const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht });
+            const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht, kp: kpValue });
             dayHours.push({
               time: weather.hourly.time[h],
               hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
@@ -163,7 +167,7 @@ function Previsao() {
         hours: dayHours,
       };
     });
-  }, [weather]);
+  }, [weather, kpValue]);
 
   if (loading) {
     return (

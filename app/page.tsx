@@ -317,11 +317,12 @@ function HomeContent() {
         gust: weather.hourly.wind_gusts_10m?.[i] ?? 0,
         rainProb: weather.hourly.precipitation_probability?.[i] ?? 0,
         temp: weather.hourly.temperature_2m?.[i] ?? 20,
+        kp: kpIndex,
       });
       items.push({ time: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), ...res });
     }
     return items;
-  }, [weather]);
+  }, [weather, kpIndex]);
 
   const bestWindow = useMemo(() => {
     const good = hourly.filter((h) => h.level === "good");

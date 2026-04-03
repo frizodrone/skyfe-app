@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  ArrowLeft, Wind, Zap, CloudRain, Thermometer,
+  ArrowLeft, Wind, Zap, CloudRain, Thermometer, Activity,
   ShieldCheck, ShieldAlert, ShieldX, TrendingDown, TrendingUp, Minus,
 } from "lucide-react";
-import { fetchWeather } from "@/lib/weather";
+import { fetchWeather, fetchKpIndex } from "@/lib/weather";
 import { calculateFlightScore, getRiskNote } from "@/lib/score";
 import Link from "next/link";
 import AuthGuard from "@/lib/AuthGuard";
@@ -94,6 +94,7 @@ function Analise() {
   const [score, setScore] = useState(0);
   const [label, setLabel] = useState("...");
   const [level, setLevel] = useState<Level>("good");
+  const [kpValue, setKpValue] = useState(0);
 
   const load = useCallback(async (lat: number, lon: number) => {
     try {
@@ -101,11 +102,14 @@ function Analise() {
       setWeather(data);
       const c = data.current;
       const rp = data.hourly?.precipitation_probability?.[0] ?? 0;
+      const kpData = await fetchKpIndex();
+      setKpValue(kpData.kp);
       const res = calculateFlightScore({
         wind: c.wind_speed_10m,
         gust: c.wind_gusts_10m,
         rainProb: rp,
         temp: c.temperature_2m,
+        kp: kpData.kp,
       });
       setScore(res.score);
       setLabel(res.label);
@@ -135,11 +139,13 @@ function Analise() {
   const gustLevel: Level = gust <= 15 ? "good" : gust <= 25 ? "warn" : "risk";
   const rainLevel: Level = rainP <= 20 ? "good" : rainP <= 50 ? "warn" : "risk";
   const tempLevel: Level = temp >= 5 && temp <= 35 ? "good" : temp >= 0 && temp <= 38 ? "warn" : "risk";
+  const kpLevel: Level = kpValue <= 2 ? "good" : kpValue <= 4 ? "warn" : "risk";
 
   const windImpact = wind <= 10 ? ("positive" as const) : wind <= 20 ? ("neutral" as const) : ("negative" as const);
   const gustImpact = gust <= 15 ? ("positive" as const) : gust <= 25 ? ("neutral" as const) : ("negative" as const);
   const rainImpact = rainP <= 20 ? ("positive" as const) : rainP <= 50 ? ("neutral" as const) : ("negative" as const);
   const tempImpact = temp >= 5 && temp <= 35 ? ("positive" as const) : ("neutral" as const);
+  const kpImpact = kpValue <= 2 ? ("positive" as const) : kpValue <= 4 ? ("neutral" as const) : ("negative" as const);
 
   const ShieldIcon = level === "good" ? ShieldCheck : level === "warn" ? ShieldAlert : ShieldX;
 
@@ -198,7 +204,7 @@ function Analise() {
         <section className="mb-10">
           <h2 className="mb-5 text-[20px] font-bold tracking-tight">Como o score é calculado</h2>
           <p className="mb-7 text-[14px] leading-relaxed text-slate-400">
-            O score de voo analisa 4 fatores em tempo real. Cada fator pode reduzir a
+            O score de voo analisa 5 fatores em tempo real. Cada fator pode reduzir a
             pontuação proporcionalmente ao risco que representa para a operação do drone.
           </p>
 
@@ -206,6 +212,7 @@ function Analise() {
           <ScoreBar label="Rajada máxima" icon={<Zap size={17} />} value={gust} max={50} unit="km/h" level={gustLevel} />
           <ScoreBar label="Probabilidade de chuva" icon={<CloudRain size={17} />} value={rainP} max={100} unit="%" level={rainLevel} />
           <ScoreBar label="Temperatura" icon={<Thermometer size={17} />} value={temp} max={45} unit="°C" level={tempLevel} />
+          <ScoreBar label="Índice Kp (geomagnético)" icon={<Activity size={17} />} value={Math.round(kpValue * 10) / 10} max={9} unit="" level={kpLevel} />
         </section>
 
         {/* Factor details */}
@@ -243,6 +250,14 @@ function Analise() {
               level={tempLevel}
               impact={tempImpact}
               riskLabel={getRiskNote("temp", temp)}
+            />
+            <FactorCard
+              title="Índice Kp"
+              icon={<Activity size={17} />}
+              note={`Kp ${kpValue.toFixed(1)} — ${getRiskNote("kp", kpValue).toLowerCase()}. ${kpValue <= 2 ? "GPS estável, sem interferência." : kpValue <= 4 ? "Possível interferência no GPS." : "Risco de perda de sinal GPS."}`}
+              level={kpLevel}
+              impact={kpImpact}
+              riskLabel={getRiskNote("kp", kpValue)}
             />
           </div>
         </section>
