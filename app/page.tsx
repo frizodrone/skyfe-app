@@ -503,11 +503,24 @@ function HomeContent() {
               {label}
             </h2>
 
-            {/* quick summary */}
+            {/* quick summary — dinâmico baseado nos dados reais */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-[13px] text-slate-300">
-              <span className="inline-flex items-center gap-1.5"><Wind size={13} className="text-slate-400" />{wind <= 15 ? "Vento ideal" : "Vento forte"}</span>
-              <span className="inline-flex items-center gap-1.5"><Droplets size={13} className="text-slate-400" />{rainNow > 0 ? "Chovendo agora" : rainP <= 20 ? "Sem chuva" : "Chuva provável"}</span>
-              <span className="inline-flex items-center gap-1.5"><Eye size={13} className="text-slate-400" />Boa visibilidade</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Wind size={13} style={{ color: LC[getMetricLevel("wind", wind)] }} />
+                {wind <= 15 ? "Vento ideal" : wind <= 29 ? "Vento moderado" : "Vento forte"}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Zap size={13} style={{ color: LC[getMetricLevel("gust", gust)] }} />
+                {gust <= 20 ? "Rajadas calmas" : gust <= 34 ? "Rajadas moderadas" : "Rajadas fortes"}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Droplets size={13} style={{ color: LC[getMetricLevel("rain", rainRiskVal)] }} />
+                {rainNow > 0 ? "Chovendo agora" : rainP <= 20 ? "Sem chuva" : rainP <= 50 ? "Chuva possível" : "Chuva provável"}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Activity size={13} style={{ color: LC[getMetricLevel("kp", kpIndex)] }} />
+                {kpIndex <= 3 ? "GPS estável" : kpIndex <= 4 ? "GPS com atenção" : "GPS instável"}
+              </span>
             </div>
           </div>
         </section>

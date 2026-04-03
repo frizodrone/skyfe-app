@@ -6,7 +6,7 @@ import {
   Edit3, Save, ChevronDown, Star, Trash2, MapPin,
 } from "lucide-react";
 import Link from "next/link";
-import AuthGuard from "@/lib/AuthGuard";
+import AuthGuard, { useIsLoggedIn, LoginPromptModal } from "@/lib/AuthGuard";
 import { supabase } from "@/lib/supabase";
 
 type Profile = { name: string; drone: string; experience: string };
@@ -83,6 +83,8 @@ function Perfil() {
   const [droneOpen, setDroneOpen] = useState(false);
   const [expOpen, setExpOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const isLoggedIn = useIsLoggedIn();
 
   useEffect(() => {
     const loadFromDB = async () => {
@@ -325,19 +327,30 @@ function Perfil() {
           <h3 className="mb-4 text-[16px] font-semibold text-slate-300">Acesso rápido</h3>
           <div className="flex flex-col gap-3">
             {[
-              { href: "/configuracoes", icon: <Settings size={18} className="text-cyan-400" />, bg: "bg-cyan-400/10", title: "Configurações de voo", sub: "Limites personalizados" },
-              { href: "/analise", icon: <Shield size={18} className="text-emerald-400" />, bg: "bg-emerald-400/10", title: "Análise detalhada", sub: "Como o score funciona" },
-              { href: "/previsao", icon: <Clock3 size={18} className="text-amber-400" />, bg: "bg-amber-400/10", title: "Previsão completa", sub: "Próximas 24h e 16 dias" },
-              { href: "/privacidade", icon: <Shield size={18} className="text-slate-400" />, bg: "bg-white/[0.04]", title: "Política de Privacidade", sub: "Como protegemos seus dados" },
-              { href: "/termos", icon: <Globe size={18} className="text-slate-400" />, bg: "bg-white/[0.04]", title: "Termos de Uso", sub: "Regras de utilização" },
+              { href: "/configuracoes", icon: <Settings size={18} className="text-cyan-400" />, bg: "bg-cyan-400/10", title: "Configurações de voo", sub: "Limites personalizados", needsLogin: true },
+              { href: "/analise", icon: <Shield size={18} className="text-emerald-400" />, bg: "bg-emerald-400/10", title: "Análise detalhada", sub: "Como o score funciona", needsLogin: true },
+              { href: "/previsao", icon: <Clock3 size={18} className="text-amber-400" />, bg: "bg-amber-400/10", title: "Previsão completa", sub: "Próximas 24h e 16 dias", needsLogin: false },
+              { href: "/privacidade", icon: <Shield size={18} className="text-slate-400" />, bg: "bg-white/[0.04]", title: "Política de Privacidade", sub: "Como protegemos seus dados", needsLogin: false },
+              { href: "/termos", icon: <Globe size={18} className="text-slate-400" />, bg: "bg-white/[0.04]", title: "Termos de Uso", sub: "Regras de utilização", needsLogin: false },
             ].map((link) => (
-              <Link key={link.href} href={link.href} className="flex items-center gap-4 rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-5 transition hover:bg-white/[0.04]">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${link.bg}`}>{link.icon}</div>
-                <div className="flex-1">
-                  <p className="text-[15px] font-medium text-slate-200">{link.title}</p>
-                  <p className="mt-0.5 text-[12px] text-slate-500">{link.sub}</p>
-                </div>
-              </Link>
+              link.needsLogin && !isLoggedIn ? (
+                <button key={link.href} onClick={() => setShowLoginModal(true)}
+                  className="flex items-center gap-4 rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-5 transition hover:bg-white/[0.04] text-left w-full">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${link.bg}`}>{link.icon}</div>
+                  <div className="flex-1">
+                    <p className="text-[15px] font-medium text-slate-200">{link.title}</p>
+                    <p className="mt-0.5 text-[12px] text-slate-500">{link.sub}</p>
+                  </div>
+                </button>
+              ) : (
+                <Link key={link.href} href={link.href} className="flex items-center gap-4 rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-5 transition hover:bg-white/[0.04]">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${link.bg}`}>{link.icon}</div>
+                  <div className="flex-1">
+                    <p className="text-[15px] font-medium text-slate-200">{link.title}</p>
+                    <p className="mt-0.5 text-[12px] text-slate-500">{link.sub}</p>
+                  </div>
+                </Link>
+              )
             ))}
           </div>
         </section>
@@ -397,6 +410,11 @@ function Perfil() {
           </button>
         </section>
       </div>
+
+      {/* Login Prompt Modal */}
+      {showLoginModal && (
+        <LoginPromptModal feature="" onClose={() => setShowLoginModal(false)} />
+      )}
 
       {/* Bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">

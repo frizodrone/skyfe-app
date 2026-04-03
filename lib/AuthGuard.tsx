@@ -54,25 +54,45 @@ export function LoginPromptModal({ onClose, feature }: { onClose: () => void; fe
           </div>
         </div>
 
-        <h2 className="mb-2 text-center text-[20px] font-bold text-white">
-          Crie sua conta grátis
+        <h2 className="mb-3 text-center text-[20px] font-bold text-white">
+          Desbloqueie todo o SkyFe
         </h2>
-        <p className="mb-6 text-center text-[14px] leading-relaxed text-slate-400">
-          Para usar <span className="text-cyan-400 font-medium">{feature}</span>, faça login ou crie sua conta. É gratuito e leva menos de 1 minuto.
+        <p className="mb-5 text-center text-[14px] leading-relaxed text-slate-400">
+          Crie sua conta grátis e aproveite o aplicativo em sua <span className="text-white font-medium">total funcionalidade</span>:
         </p>
+
+        {/* Benefits list */}
+        <div className="mb-6 flex flex-col gap-2.5 text-[13px] text-slate-300">
+          <div className="flex items-center gap-2.5">
+            <span className="h-[6px] w-[6px] rounded-full bg-cyan-400 shrink-0" />
+            Análise detalhada por fator de risco
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="h-[6px] w-[6px] rounded-full bg-emerald-400 shrink-0" />
+            Salvar locais favoritos
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="h-[6px] w-[6px] rounded-full bg-amber-400 shrink-0" />
+            Personalizar limites do seu drone
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="h-[6px] w-[6px] rounded-full bg-purple-400 shrink-0" />
+            Perfil com dados salvos na nuvem
+          </div>
+        </div>
 
         <a href="/login"
           className="mb-3 flex w-full items-center justify-center rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-3.5 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
-          Criar conta / Entrar
+          Criar conta grátis
         </a>
 
         <button onClick={onClose}
           className="flex w-full items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] py-3.5 text-[14px] font-medium text-slate-400 transition hover:bg-white/[0.05]">
-          Agora não
+          Continuar sem conta
         </button>
 
         <p className="mt-4 text-center text-[11px] text-slate-600">
-          Clima, previsão e mapa funcionam sem conta
+          100% gratuito — sem cartão de crédito
         </p>
       </div>
     </div>
