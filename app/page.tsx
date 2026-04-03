@@ -5,8 +5,15 @@ import Link from "next/link";
 import {
   Search, Settings, Wind, Zap, CloudRain, Thermometer,
   Sun, Map, Clock3, User, Eye, Droplets, MapPin, LocateFixed, X, Star, Activity,
+  Sunrise, Sunset, Cloud, Navigation, ChevronDown, Mountain,
 } from "lucide-react";
-import { fetchWeather, reverseGeocode, searchCities, fetchKpIndex } from "@/lib/weather";
+import {
+  fetchWeather, reverseGeocode, searchCities, fetchKpIndex,
+  getSunTimes, windDirectionLabel, windDirectionLabelFull,
+  getVisibilityKm, getVisibilityLabel,
+  getWindAtAltitude, getGustAtAltitude, WIND_ALTITUDES,
+  type WindAltitude, type WeatherData,
+} from "@/lib/weather";
 import { calculateFlightScore, getRiskNote, getMetricLevel } from "@/lib/score";
 import AuthGuard, { useIsLoggedIn, LoginPromptModal } from "@/lib/AuthGuard";
 import { useSharedLocation } from "@/lib/useSharedLocation";
@@ -28,7 +35,6 @@ function SearchModal({ onSelect, onClose }: { onSelect: (r: any) => void; onClos
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // Load favorites
   useEffect(() => {
     const loadFavs = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -73,7 +79,6 @@ function SearchModal({ onSelect, onClose }: { onSelect: (r: any) => void; onClos
         <span className="text-[15px] font-medium text-cyan-400">Usar minha localização</span>
       </button>
 
-      {/* Favorites */}
       {!query && favorites.length > 0 && (
         <div className="mb-3">
           <p className="px-2 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Locais favoritos</p>
@@ -150,33 +155,117 @@ function MetricCard({ icon, title, value, unit, note, level }: {
         boxShadow: `0 0 18px ${color}06, inset 0 1px 0 rgba(255,255,255,0.03)`,
       }}
     >
-      {/* subtle top glow */}
       <div className="absolute -top-3 left-1/2 h-6 w-10 -translate-x-1/2 rounded-full opacity-35 blur-lg" style={{ background: color }} />
-
-      {/* icon — fixed height */}
-      <div className="relative z-10 flex h-[24px] items-center justify-center" style={{ color }}>
-        {icon}
-      </div>
-
-      {/* title — fixed height to align across cards */}
+      <div className="relative z-10 flex h-[24px] items-center justify-center" style={{ color }}>{icon}</div>
       <div className="relative z-10 mt-2 flex h-[32px] items-center justify-center">
         <p className="whitespace-pre-line text-[9px] uppercase leading-tight tracking-[0.1em] text-slate-500">{title}</p>
       </div>
-
-      {/* value — fixed height to align across cards */}
       <div className="relative z-10 mt-3 flex h-[30px] items-end justify-center">
         <p className="text-[24px] font-semibold leading-none tracking-tight text-white">{value}</p>
       </div>
-
-      {/* unit — fixed height */}
       <div className="relative z-10 flex h-[18px] items-center justify-center">
         {unit ? <p className="text-[11px] text-slate-500">{unit}</p> : <span />}
       </div>
-
-      {/* note — fixed height to align across cards */}
       <div className="relative z-10 flex h-[16px] items-center justify-center">
         <p className="text-[10px] font-medium" style={{ color: `${color}bb` }}>{note}</p>
       </div>
+    </div>
+  );
+}
+
+/* ───── Wind Compass ───── */
+function WindCompass({ direction, speed, gust }: { direction: number; speed: number; gust: number }) {
+  const labels = ["N", "E", "S", "O"];
+  return (
+    <div className="relative overflow-hidden rounded-[22px] border border-cyan-400/[0.12] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] p-5">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,_rgba(45,204,255,0.06),_transparent_50%)]" />
+      <div className="relative z-10">
+        <div className="mb-3 flex items-center gap-2">
+          <Navigation size={16} className="text-cyan-400" />
+          <span className="text-[13px] font-semibold text-slate-300">Bússola do Vento</span>
+        </div>
+        <p className="mb-4 text-center text-[12px] text-cyan-400/80">
+          Vento soprando para {windDirectionLabelFull(direction)} — {direction}° {windDirectionLabel(direction)}
+        </p>
+        <div className="relative mx-auto h-[180px] w-[180px]">
+          {/* Compass ring */}
+          <svg width="180" height="180" viewBox="0 0 180 180" className="absolute inset-0">
+            <circle cx="90" cy="90" r="80" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+            <circle cx="90" cy="90" r="60" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+            <circle cx="90" cy="90" r="40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+            {/* Tick marks */}
+            {Array.from({ length: 36 }, (_, i) => {
+              const angle = (i * 10 * Math.PI) / 180;
+              const isMajor = i % 9 === 0;
+              const r1 = isMajor ? 68 : 74;
+              const r2 = 80;
+              return (
+                <line key={i}
+                  x1={90 + r1 * Math.sin(angle)} y1={90 - r1 * Math.cos(angle)}
+                  x2={90 + r2 * Math.sin(angle)} y2={90 - r2 * Math.cos(angle)}
+                  stroke={isMajor ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)"}
+                  strokeWidth={isMajor ? "1.5" : "0.5"} />
+              );
+            })}
+            {/* Cardinal labels */}
+            {labels.map((l, i) => {
+              const angle = (i * 90 * Math.PI) / 180;
+              const r = 62;
+              return (
+                <text key={l} x={90 + r * Math.sin(angle)} y={90 - r * Math.cos(angle)}
+                  textAnchor="middle" dominantBaseline="central"
+                  fill={l === "N" ? "#ff5a5f" : "rgba(255,255,255,0.5)"}
+                  fontSize={l === "N" ? "14" : "12"} fontWeight={l === "N" ? "700" : "500"}>
+                  {l}
+                </text>
+              );
+            })}
+            {/* North indicator (red) */}
+            <line x1="90" y1="12" x2="90" y2="18" stroke="#ff5a5f" strokeWidth="2.5" strokeLinecap="round" />
+            {/* Wind arrow */}
+            <g transform={`rotate(${direction} 90 90)`}>
+              <line x1="90" y1="90" x2="90" y2="24" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" />
+              <polygon points="90,20 84,34 96,34" fill="#22d3ee" />
+            </g>
+            {/* Center dot */}
+            <circle cx="90" cy="90" r="4" fill="#22d3ee" opacity="0.8" />
+          </svg>
+        </div>
+        <div className="mt-4 flex items-center justify-around">
+          <div className="text-center">
+            <p className="text-[10px] uppercase tracking-wider text-slate-500">Velocidade</p>
+            <p className="text-[18px] font-bold text-white">{speed} <span className="text-[12px] text-slate-500">km/h</span></p>
+          </div>
+          <div className="h-8 w-px bg-white/[0.08]" />
+          <div className="text-center">
+            <p className="text-[10px] uppercase tracking-wider text-slate-500">Rajada</p>
+            <p className="text-[18px] font-bold text-white">{gust} <span className="text-[12px] text-slate-500">km/h</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───── Altitude Selector ───── */
+function AltitudeSelector({ selected, onChange }: { selected: WindAltitude; onChange: (a: WindAltitude) => void }) {
+  const altLabels: Record<WindAltitude, string> = {
+    0: "Solo", 20: "20m", 40: "40m", 60: "60m", 80: "80m", 100: "100m", 120: "120m",
+  };
+  return (
+    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+      {WIND_ALTITUDES.map((alt) => (
+        <button key={alt} onClick={() => onChange(alt)}
+          className="shrink-0 rounded-xl px-3 py-2 text-[12px] font-semibold transition-all duration-200"
+          style={selected === alt ? {
+            background: "linear-gradient(135deg, rgba(45,204,255,0.15), rgba(45,255,179,0.1))",
+            border: "1px solid rgba(45,204,255,0.3)", color: "#2dccff",
+          } : {
+            background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)", color: "#64748b",
+          }}>
+          {altLabels[alt]}
+        </button>
+      ))}
     </div>
   );
 }
@@ -193,10 +282,7 @@ function HourlyCard({ item }: { item: HourlyItem }) {
         minWidth: "80px",
       }}
     >
-      <span
-        className="h-[12px] w-[12px] rounded-full"
-        style={{ background: color, boxShadow: `0 0 12px ${color}55` }}
-      />
+      <span className="h-[12px] w-[12px] rounded-full" style={{ background: color, boxShadow: `0 0 12px ${color}55` }} />
       <span className="text-[15px] font-semibold text-slate-100">{item.time}</span>
       <span className="text-[11px] font-medium" style={{ color: `${color}cc` }}>
         {item.level === "good" ? "Seguro" : item.level === "warn" ? "Cuidado" : "Risco"}
@@ -210,7 +296,7 @@ function HourlyCard({ item }: { item: HourlyItem }) {
 /* ═══════════════════════════════════════════ */
 function HomeContent() {
   const [loading, setLoading] = useState(true);
-  const [weather, setWeather] = useState<any>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
   const [score, setScore] = useState(0);
   const [label, setLabel] = useState("...");
   const [level, setLevel] = useState<Level>("good");
@@ -224,6 +310,7 @@ function HomeContent() {
   const [kpIndex, setKpIndex] = useState(0);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginFeature, setLoginFeature] = useState("");
+  const [selectedAltitude, setSelectedAltitude] = useState<WindAltitude>(0);
   const isLoggedIn = useIsLoggedIn();
   const shared = useSharedLocation();
 
@@ -294,7 +381,6 @@ function HomeContent() {
     setSavingFav(false);
   };
 
-  // Carregar clima quando localização compartilhada mudar
   useEffect(() => {
     if (shared.loading || !shared.location) return;
     loadWeather(shared.location.lat, shared.location.lon, shared.location.name);
@@ -302,7 +388,6 @@ function HomeContent() {
 
   const handleSearchSelect = useCallback((result: any) => {
     if (!result) {
-      // "Usar minha localização" — limpar pesquisa e voltar ao GPS
       shared.clearToGPS();
       return;
     }
@@ -337,17 +422,22 @@ function HomeContent() {
   }, [hourly]);
 
   /* ── derived values ── */
-  const wind = weather ? Math.round(weather.current.wind_speed_10m) : 0;
-  const gust = weather ? Math.round(weather.current.wind_gusts_10m) : 0;
+  const wind10m = weather ? weather.current.wind_speed_10m : 0;
+  const gust10m = weather ? weather.current.wind_gusts_10m : 0;
+  const wind80m = weather?.hourly?.wind_speed_80m?.[0] ?? wind10m;
+  const wind120m = weather?.hourly?.wind_speed_120m?.[0] ?? wind80m;
+
+  const wind = Math.round(getWindAtAltitude(wind10m, wind80m, wind120m, selectedAltitude));
+  const gust = Math.round(getGustAtAltitude(gust10m, wind10m, wind80m, wind120m, selectedAltitude));
   const rainP = weather ? (weather.hourly?.precipitation_probability?.[0] ?? 0) : 0;
   const temp = weather ? Math.round(weather.current.temperature_2m) : 0;
+  const windDir = weather?.current?.wind_direction_10m ?? 0;
+  const cloudCover = weather?.current?.cloud_cover ?? 0;
+  const visibility = weather?.hourly?.visibility?.[0] ?? 24140;
 
-  // Check real precipitation from multiple sources for accuracy
   const rainCurrent = weather?.current?.precipitation ?? 0;
   const rainCurrentRain = weather?.current?.rain ?? 0;
-  // Check most recent hourly precipitation
   const recentHourlyPrecip = weather?.hourly?.precipitation?.[0] ?? 0;
-  // Use the highest value from all sources
   const rainNow = Math.max(rainCurrent, rainCurrentRain, recentHourlyPrecip);
 
   const rainDisplay = rainNow > 0 ? `${rainNow.toFixed(1)}mm` : `${rainP}%`;
@@ -356,10 +446,15 @@ function HomeContent() {
   const rainRiskVal = rainNow > 0 ? 100 : rainP;
   const rainNote = rainNow > 0 ? `Chovendo (${rainP}% prob.)` : getRiskNote("rain", rainP);
 
+  const sunTimes = weather ? getSunTimes(weather) : null;
+
+  /* ── altitude label ── */
+  const altLabel = selectedAltitude === 0 ? "em solo" : `a ${selectedAltitude}m`;
+
   /* ── per-metric risk level ── */
   const metrics = [
-    { icon: <Wind size={20} />, title: "VENTO\nMÉDIO", value: weather ? `${wind}` : "--", unit: "km/h", note: getRiskNote("wind", wind), metricLevel: getMetricLevel("wind", wind) },
-    { icon: <Zap size={20} />, title: "RAJADA\nMÁX", value: weather ? `${gust}` : "--", unit: "km/h", note: getRiskNote("gust", gust), metricLevel: getMetricLevel("gust", gust) },
+    { icon: <Wind size={20} />, title: `VENTO\n${altLabel.toUpperCase()}`, value: weather ? `${wind}` : "--", unit: "km/h", note: getRiskNote("wind", wind), metricLevel: getMetricLevel("wind", wind) },
+    { icon: <Zap size={20} />, title: `RAJADA\n${altLabel.toUpperCase()}`, value: weather ? `${gust}` : "--", unit: "km/h", note: getRiskNote("gust", gust), metricLevel: getMetricLevel("gust", gust) },
     { icon: <CloudRain size={20} />, title: rainTitle, value: weather ? rainDisplay : "--", unit: rainUnit, note: rainNote, metricLevel: getMetricLevel("rain", rainRiskVal) },
     { icon: <Thermometer size={20} />, title: "TEMP", value: weather ? `${temp}°` : "--", unit: "", note: getRiskNote("temp", temp), metricLevel: getMetricLevel("temp", temp) },
     { icon: <Activity size={20} />, title: "ÍNDICE\nKP", value: weather ? `${kpIndex.toFixed(1)}` : "--", unit: "", note: getRiskNote("kp", kpIndex), metricLevel: getMetricLevel("kp", kpIndex) },
@@ -373,7 +468,6 @@ function HomeContent() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,_rgba(45,204,255,0.1),_transparent_50%)]" />
         </div>
         <div className="relative z-10 flex flex-col items-center gap-6">
-          {/* Logo animada */}
           <div className="relative">
             <div className="grid h-20 w-20 place-items-center rounded-[24px] border border-cyan-400/20 bg-white/[0.03] shadow-[0_0_40px_rgba(45,204,255,0.15)]">
               <div className="relative h-[30px] w-[30px]">
@@ -386,7 +480,6 @@ function HomeContent() {
             </div>
           </div>
           <h1 className="text-[28px] font-bold tracking-tight">Sky<span className="text-cyan-400">Fe</span></h1>
-          {/* Loading bar */}
           <div className="h-[3px] w-48 overflow-hidden rounded-full bg-white/[0.06]">
             <div className="h-full w-full animate-loading-bar rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
           </div>
@@ -399,7 +492,6 @@ function HomeContent() {
   /* ═══ RENDER ═══ */
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#04090f] text-white">
-      {/* ambient bg glow */}
       <div className="pointer-events-none fixed inset-0 opacity-80">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_34%)]" />
       </div>
@@ -432,11 +524,13 @@ function HomeContent() {
           </div>
         </header>
 
-        {/* ─── Location ─── */}
+        {/* ─── Location (endereço completo) ─── */}
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-2">
-            <p className="inline-flex items-center gap-1.5 text-[17px] font-medium text-slate-100">{placeName} <MapPin size={14} className="text-cyan-400" /></p>
-            {/* Botão (x) para voltar ao GPS — só aparece quando é pesquisa */}
+            <p className="inline-flex items-center gap-1.5 text-[15px] font-medium text-slate-100 leading-snug max-w-[320px]">
+              <MapPin size={14} className="text-cyan-400 shrink-0" />
+              <span className="truncate">{placeName}</span>
+            </p>
             {shared.location && !shared.location.isGPS && (
               <button onClick={() => shared.clearToGPS()}
                 className="grid h-6 w-6 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-slate-400 transition hover:bg-white/[0.08] hover:text-white">
@@ -453,28 +547,55 @@ function HomeContent() {
 
         {error && <div className="mb-4 rounded-2xl border border-red-400/15 bg-red-400/[0.06] px-4 py-3 text-[14px] text-red-200">{error}</div>}
 
-        {/* ─── Metric Cards (PRIMEIRO) ─── */}
+        {/* ─── Altitude Selector ─── */}
+        <section className="mb-4">
+          <div className="mb-2.5 flex items-center gap-2">
+            <Mountain size={14} className="text-cyan-400" />
+            <span className="text-[12px] font-semibold uppercase tracking-wider text-slate-500">Altitude do vento</span>
+          </div>
+          <AltitudeSelector selected={selectedAltitude} onChange={setSelectedAltitude} />
+        </section>
+
+        {/* ─── Metric Cards ─── */}
         <section className="mb-6 grid grid-cols-5 gap-2">
           {metrics.map((m) => (
-            <MetricCard
-              key={m.title}
-              icon={m.icon}
-              title={m.title}
-              value={m.value}
-              unit={m.unit}
-              note={m.note}
-              level={m.metricLevel}
-            />
+            <MetricCard key={m.title} icon={m.icon} title={m.title} value={m.value} unit={m.unit} note={m.note} level={m.metricLevel} />
           ))}
+        </section>
+
+        {/* ─── Sun Times + Visibility + Cloud Cover ─── */}
+        <section className="mb-6 grid grid-cols-4 gap-2">
+          {sunTimes && (
+            <>
+              <div className="flex flex-col items-center gap-1.5 rounded-[16px] border border-amber-400/15 bg-amber-400/[0.04] px-2 py-3.5">
+                <Sunrise size={16} className="text-amber-400" />
+                <span className="text-[9px] uppercase tracking-wider text-slate-500">Nascer</span>
+                <span className="text-[16px] font-bold text-white">{sunTimes.sunrise}</span>
+              </div>
+              <div className="flex flex-col items-center gap-1.5 rounded-[16px] border border-orange-400/15 bg-orange-400/[0.04] px-2 py-3.5">
+                <Sunset size={16} className="text-orange-400" />
+                <span className="text-[9px] uppercase tracking-wider text-slate-500">Pôr</span>
+                <span className="text-[16px] font-bold text-white">{sunTimes.sunset}</span>
+              </div>
+            </>
+          )}
+          <div className="flex flex-col items-center gap-1.5 rounded-[16px] border border-blue-400/15 bg-blue-400/[0.04] px-2 py-3.5">
+            <Eye size={16} className="text-blue-400" />
+            <span className="text-[9px] uppercase tracking-wider text-slate-500">Visib.</span>
+            <span className="text-[14px] font-bold text-white">{getVisibilityKm(visibility)}</span>
+            <span className="text-[9px] text-slate-500">{getVisibilityLabel(visibility)}</span>
+          </div>
+          <div className="flex flex-col items-center gap-1.5 rounded-[16px] border border-slate-400/15 bg-slate-400/[0.04] px-2 py-3.5">
+            <Cloud size={16} className="text-slate-400" />
+            <span className="text-[9px] uppercase tracking-wider text-slate-500">Nuvens</span>
+            <span className="text-[16px] font-bold text-white">{cloudCover}%</span>
+          </div>
         </section>
 
         {/* ─── Score / Radar Section ─── */}
         <section className="relative mb-10 overflow-hidden rounded-[28px] border border-cyan-400/[0.12] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] px-5 py-8 shadow-[0_0_50px_rgba(45,204,255,0.06)]">
-          {/* double border glow */}
           <div className="pointer-events-none absolute inset-0 rounded-[28px] border border-cyan-400/[0.06]" style={{ margin: "3px" }} />
-          {/* radial glow */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,_rgba(45,204,255,0.1),_transparent_50%)]" />
-          {/* radar rings background */}
           <div className="pointer-events-none absolute left-1/2 top-[33%] h-[290px] w-[290px] -translate-x-1/2 -translate-y-1/2">
             <div className="absolute inset-0 rounded-full border border-cyan-300/[0.08]" />
             <div className="absolute inset-[22px] rounded-full border border-cyan-300/[0.06]" />
@@ -488,7 +609,6 @@ function HomeContent() {
           <div className="relative z-10 flex flex-col items-center">
             <Radar score={score} level={level} />
 
-            {/* status badge */}
             <div className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-1.5"
               style={{ background: `${LC[level]}10`, border: `1px solid ${LC[level]}20` }}>
               <span className="h-[7px] w-[7px] rounded-full animate-pulse-dot" style={{ background: LC[level] }} />
@@ -497,13 +617,11 @@ function HomeContent() {
               </span>
             </div>
 
-            {/* main label */}
             <h2 className="mt-3 text-center text-[28px] font-bold uppercase tracking-tight"
               style={{ color: LC[level], textShadow: `0 0 24px ${LC[level]}20` }}>
               {label}
             </h2>
 
-            {/* quick summary — dinâmico baseado nos dados reais */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-[13px] text-slate-300">
               <span className="inline-flex items-center gap-1.5">
                 <Wind size={13} style={{ color: LC[getMetricLevel("wind", wind)] }} />
@@ -525,7 +643,12 @@ function HomeContent() {
           </div>
         </section>
 
-        {/* ─── Hourly Forecast v2 (mini cards, horizontal scroll) ─── */}
+        {/* ─── Wind Compass ─── */}
+        <section className="mb-10">
+          <WindCompass direction={windDir} speed={Math.round(wind10m)} gust={Math.round(gust10m)} />
+        </section>
+
+        {/* ─── Hourly Forecast ─── */}
         <section className="mb-10">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-[20px] font-bold tracking-tight">Previsão por hora</h3>
@@ -536,14 +659,12 @@ function HomeContent() {
             </div>
           </div>
 
-          {/* scrollable mini cards */}
           <div className="no-scrollbar -mx-5 flex gap-3 overflow-x-auto px-5 pb-2">
             {hourly.map((h) => (
               <HourlyCard key={h.time} item={h} />
             ))}
           </div>
 
-          {/* best window */}
           {bestWindow && (
             <div className="mt-6 rounded-2xl border border-cyan-400/[0.1] bg-cyan-400/[0.04] px-4 py-3.5 text-center">
               <p className="inline-flex items-center gap-2 text-[13px] text-cyan-300">
@@ -567,7 +688,6 @@ function HomeContent() {
           Ver análise detalhada
         </button>
 
-        {/* Login Prompt Modal */}
         {showLoginModal && (
           <LoginPromptModal feature={loginFeature} onClose={() => setShowLoginModal(false)} />
         )}

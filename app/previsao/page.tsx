@@ -4,17 +4,22 @@ import { useEffect, useState, useMemo } from "react";
 import {
   ArrowLeft, Wind, Zap, CloudRain, Thermometer, Activity,
   Sun, Clock3, Map, User, ChevronDown, MapPin, X,
+  Sunrise, Sunset, Eye, Cloud,
 } from "lucide-react";
 import Link from "next/link";
 import { calculateFlightScore } from "@/lib/score";
-import { fetchKpIndex, fetchKpForecast, getKpForTime, type KpForecastItem } from "@/lib/weather";
+import {
+  fetchKpIndex, fetchKpForecast, getKpForTime,
+  getSunTimes, getVisibilityKm,
+  type KpForecastItem, type WeatherData,
+} from "@/lib/weather";
 import { useSharedLocation } from "@/lib/useSharedLocation";
 
 type Level = "good" | "warn" | "risk";
 const LC: Record<Level, string> = { good: "#2dffb3", warn: "#ffd84d", risk: "#ff5a5f" };
 
-type HourItem = { time: string; hour: string; score: number; level: Level; wind: number; gust: number; rainP: number; temp: number; kp: number; };
-type DayItem = { date: string; dayLabel: string; avgScore: number; bestScore: number; bestWindow: string; level: Level; minTemp: number; maxTemp: number; maxWind: number; maxGust: number; maxRain: number; hours: HourItem[]; };
+type HourItem = { time: string; hour: string; score: number; level: Level; wind: number; gust: number; rainP: number; temp: number; kp: number; visibility?: number; cloudCover?: number; };
+type DayItem = { date: string; dayLabel: string; avgScore: number; bestScore: number; bestWindow: string; level: Level; minTemp: number; maxTemp: number; maxWind: number; maxGust: number; maxRain: number; sunrise?: string; sunset?: string; hours: HourItem[]; };
 
 export default function PrevisaoPage() {
   const shared = useSharedLocation();
@@ -30,7 +35,7 @@ export default function PrevisaoPage() {
     const { lat, lon } = shared.location;
     setLoading(true);
     Promise.all([
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_gusts_10m_max,precipitation_probability_max&forecast_days=16&timezone=auto`).then(r => r.json()),
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability,visibility,cloud_cover&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_gusts_10m_max,precipitation_probability_max,sunrise,sunset&forecast_days=16&timezone=auto`).then(r => r.json()),
       fetchKpIndex(),
       fetchKpForecast(),
     ]).then(([data, kpData, kpFc]) => {
@@ -51,10 +56,11 @@ export default function PrevisaoPage() {
       const gust = weather.hourly.wind_gusts_10m?.[i] ?? 0;
       const rainP = weather.hourly.precipitation_probability?.[i] ?? 0;
       const temp = weather.hourly.temperature_2m?.[i] ?? 20;
-      // Kp variável: usa previsão NOAA se disponível, senão usa o atual
+      const vis = weather.hourly.visibility?.[i] ?? 24140;
+      const cc = weather.hourly.cloud_cover?.[i] ?? 0;
       const hourKp = kpForecast.length > 0 ? getKpForTime(kpForecast, weather.hourly.time[i]) : kpIndex;
       const res = calculateFlightScore({ wind, gust, rainProb: rainP, temp, kp: hourKp });
-      items.push({ time: weather.hourly.time[i], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: res.score, level: res.level, wind: Math.round(wind), gust: Math.round(gust), rainP: Math.round(rainP), temp: Math.round(temp), kp: parseFloat(hourKp.toFixed(1)) });
+      items.push({ time: weather.hourly.time[i], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: res.score, level: res.level, wind: Math.round(wind), gust: Math.round(gust), rainP: Math.round(rainP), temp: Math.round(temp), kp: parseFloat(hourKp.toFixed(1)), visibility: vis, cloudCover: cc });
     }
     return items;
   }, [weather, kpIndex, kpForecast]);
@@ -76,6 +82,18 @@ export default function PrevisaoPage() {
       const maxG = Math.round(weather.daily.wind_gusts_10m_max?.[i] ?? 0);
       const maxR = Math.round(weather.daily.precipitation_probability_max?.[i] ?? 0);
 
+      // Sunrise/Sunset
+      let sunrise: string | undefined;
+      let sunset: string | undefined;
+      if (weather.daily.sunrise?.[i]) {
+        const sr = new Date(weather.daily.sunrise[i]);
+        sunrise = sr.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      }
+      if (weather.daily.sunset?.[i]) {
+        const ss = new Date(weather.daily.sunset[i]);
+        sunset = ss.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      }
+
       const dayHours: HourItem[] = [];
       if (weather.hourly?.time) {
         for (let h = 0; h < weather.hourly.time.length; h++) {
@@ -85,7 +103,6 @@ export default function PrevisaoPage() {
             const hg = weather.hourly.wind_gusts_10m?.[h] ?? 0;
             const hr = weather.hourly.precipitation_probability?.[h] ?? 0;
             const ht = weather.hourly.temperature_2m?.[h] ?? 20;
-            // Kp variável da previsão NOAA (cobre 3 dias), depois assume 0
             const hkp = kpForecast.length > 0 ? getKpForTime(kpForecast, weather.hourly.time[h]) : ((isToday || isTomorrow) ? kpIndex : 0);
             const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht, kp: hkp });
             dayHours.push({ time: weather.hourly.time[h], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: hres.score, level: hres.level, wind: Math.round(hw), gust: Math.round(hg), rainP: Math.round(hr), temp: Math.round(ht), kp: parseFloat(hkp.toFixed(1)) });
@@ -107,7 +124,7 @@ export default function PrevisaoPage() {
       const allAvg = dayHours.length > 0 ? dayHours.reduce((s, h) => s + h.score, 0) / dayHours.length : 0;
       const displayScore = dayHours.length > 0 ? Math.round(bestScore * 0.7 + allAvg * 0.3) : 0;
       const displayLevel: Level = displayScore >= 70 ? "good" : displayScore >= 45 ? "warn" : "risk";
-      return { date: dateStr, dayLabel, avgScore: displayScore, bestScore, bestWindow, level: displayLevel, minTemp: minT, maxTemp: maxT, maxWind: maxW, maxGust: maxG, maxRain: maxR, hours: dayHours };
+      return { date: dateStr, dayLabel, avgScore: displayScore, bestScore, bestWindow, level: displayLevel, minTemp: minT, maxTemp: maxT, maxWind: maxW, maxGust: maxG, maxRain: maxR, sunrise, sunset, hours: dayHours };
     });
   }, [weather, kpIndex, kpForecast]);
 
@@ -148,11 +165,10 @@ export default function PrevisaoPage() {
           <h1 className="flex-1 text-[24px] font-bold tracking-tight">Previsão completa</h1>
         </header>
 
-        {/* Localização + botão (x) */}
         {shared.location && (
           <div className="mb-6 flex items-center justify-center gap-2">
             <MapPin size={14} className="text-cyan-400" />
-            <p className="text-[14px] font-medium text-slate-300">{shared.location.name}</p>
+            <p className="text-[14px] font-medium text-slate-300 truncate max-w-[280px]">{shared.location.name}</p>
             {!shared.location.isGPS && (
               <button onClick={() => shared.clearToGPS()}
                 className="grid h-6 w-6 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-slate-400 transition hover:bg-white/[0.08] hover:text-white">
@@ -194,6 +210,9 @@ export default function PrevisaoPage() {
                     <span className="inline-flex items-center gap-1"><CloudRain size={11} />{h.rainP}%</span>
                     <span className="inline-flex items-center gap-1"><Thermometer size={11} />{h.temp}°</span>
                     <span className="inline-flex items-center gap-1"><Activity size={11} />Kp {h.kp.toFixed(1)}</span>
+                    {h.visibility !== undefined && (
+                      <span className="inline-flex items-center gap-1"><Eye size={11} />{getVisibilityKm(h.visibility)}</span>
+                    )}
                   </div>
                 </div>
                 <span className="h-[12px] w-[12px] shrink-0 rounded-full" style={{ background: LC[h.level], boxShadow: `0 0 10px ${LC[h.level]}44` }} />
@@ -218,6 +237,9 @@ export default function PrevisaoPage() {
                       <span>{day.minTemp}°–{day.maxTemp}°</span>
                       <span className="inline-flex items-center gap-1"><Wind size={11} />{day.maxWind}</span>
                       <span className="inline-flex items-center gap-1"><CloudRain size={11} />{day.maxRain}%</span>
+                      {day.sunrise && day.sunset && (
+                        <span className="inline-flex items-center gap-1"><Sunrise size={11} className="text-amber-400" />{day.sunrise} <Sunset size={11} className="text-orange-400 ml-1" />{day.sunset}</span>
+                      )}
                     </div>
                     {day.bestWindow && day.bestScore > 0 && (
                       <p className="mt-1.5 text-[11px] font-medium text-cyan-400/80">Melhor janela: {day.bestWindow} (score {day.bestScore})</p>
