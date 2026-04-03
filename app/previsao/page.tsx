@@ -131,7 +131,7 @@ function Previsao() {
       const maxT = Math.round(weather.daily.temperature_2m_max?.[i] ?? 0);
       const avgT = (minT + maxT) / 2;
 
-      const res = calculateFlightScore({ wind: maxW, gust: maxG, rainProb: maxR, temp: avgT, kp: kpValue });
+      const res = calculateFlightScore({ wind: maxW, gust: maxG, rainProb: maxR, temp: avgT });
 
       const dayHours: HourItem[] = [];
       if (weather.hourly?.time) {
@@ -142,7 +142,7 @@ function Previsao() {
             const hg = weather.hourly.wind_gusts_10m?.[h] ?? 0;
             const hr = weather.hourly.precipitation_probability?.[h] ?? 0;
             const ht = weather.hourly.temperature_2m?.[h] ?? 20;
-            const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht, kp: kpValue });
+            const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht });
             dayHours.push({
               time: weather.hourly.time[h],
               hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
@@ -167,7 +167,7 @@ function Previsao() {
         hours: dayHours,
       };
     });
-  }, [weather, kpValue]);
+  }, [weather]);
 
   if (loading) {
     return (
@@ -345,7 +345,7 @@ function Previsao() {
                           <span className="w-[50px] text-[13px] font-medium text-slate-200">{h.hour}</span>
                           <span className="w-[32px] text-[14px] font-bold" style={{ color: LC[h.level] }}>{h.score}</span>
                           <span className="flex-1 text-[11px] text-slate-500">
-                            {h.wind}km/h · {h.rainP}% · {h.temp}° · Kp {kpValue.toFixed(1)}
+                            {h.wind}km/h · {h.rainP}% · {h.temp}°
                           </span>
                         </div>
                       ))}
