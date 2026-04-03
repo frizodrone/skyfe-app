@@ -270,6 +270,12 @@ export default function LoginPage() {
           <a href="/termos" className="transition hover:text-slate-400">Termos de Uso</a>
         </div>
 
+        {/* Voltar ao app sem login */}
+        <a href="/"
+          className="mt-6 flex items-center justify-center text-[13px] font-medium text-slate-500 transition hover:text-slate-300">
+          Continuar sem conta →
+        </a>
+
       </div>
     </main>
   );

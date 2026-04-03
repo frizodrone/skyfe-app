@@ -397,17 +397,26 @@ function Perfil() {
           )}
         </section>
 
-        {/* Logout */}
+        {/* Auth action */}
         <section className="mb-6">
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              window.location.href = "/login";
-            }}
-            className="flex w-full items-center justify-center gap-2 rounded-[18px] border border-red-400/15 bg-red-400/[0.04] px-5 py-4 text-[15px] font-medium text-red-400 transition hover:bg-red-400/[0.08]"
-          >
-            Sair da conta
-          </button>
+          {isLoggedIn ? (
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                window.location.href = "/";
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-[18px] border border-red-400/15 bg-red-400/[0.04] px-5 py-4 text-[15px] font-medium text-red-400 transition hover:bg-red-400/[0.08]"
+            >
+              Sair da conta
+            </button>
+          ) : (
+            <a
+              href="/login"
+              className="flex w-full items-center justify-center gap-2 rounded-[18px] bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-4 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105"
+            >
+              Entrar / Criar conta grátis
+            </a>
+          )}
         </section>
       </div>
 

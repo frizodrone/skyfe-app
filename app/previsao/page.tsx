@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { calculateFlightScore } from "@/lib/score";
-import { fetchKpIndex } from "@/lib/weather";
+import { fetchKpIndex, fetchKpForecast, getKpForTime, type KpForecastItem } from "@/lib/weather";
 import { useSharedLocation } from "@/lib/useSharedLocation";
 
 type Level = "good" | "warn" | "risk";
@@ -23,6 +23,7 @@ export default function PrevisaoPage() {
   const [activeTab, setActiveTab] = useState<"hours" | "days">("hours");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [kpIndex, setKpIndex] = useState(0);
+  const [kpForecast, setKpForecast] = useState<KpForecastItem[]>([]);
 
   useEffect(() => {
     if (shared.loading || !shared.location) return;
@@ -31,9 +32,11 @@ export default function PrevisaoPage() {
     Promise.all([
       fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_gusts_10m_max,precipitation_probability_max&forecast_days=16&timezone=auto`).then(r => r.json()),
       fetchKpIndex(),
-    ]).then(([data, kpData]) => {
+      fetchKpForecast(),
+    ]).then(([data, kpData, kpFc]) => {
       setWeather(data);
       setKpIndex(kpData.kp);
+      setKpForecast(kpFc);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [shared.location, shared.loading]);
 
@@ -48,11 +51,13 @@ export default function PrevisaoPage() {
       const gust = weather.hourly.wind_gusts_10m?.[i] ?? 0;
       const rainP = weather.hourly.precipitation_probability?.[i] ?? 0;
       const temp = weather.hourly.temperature_2m?.[i] ?? 20;
-      const res = calculateFlightScore({ wind, gust, rainProb: rainP, temp, kp: kpIndex });
-      items.push({ time: weather.hourly.time[i], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: res.score, level: res.level, wind: Math.round(wind), gust: Math.round(gust), rainP: Math.round(rainP), temp: Math.round(temp), kp: kpIndex });
+      // Kp variável: usa previsão NOAA se disponível, senão usa o atual
+      const hourKp = kpForecast.length > 0 ? getKpForTime(kpForecast, weather.hourly.time[i]) : kpIndex;
+      const res = calculateFlightScore({ wind, gust, rainProb: rainP, temp, kp: hourKp });
+      items.push({ time: weather.hourly.time[i], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: res.score, level: res.level, wind: Math.round(wind), gust: Math.round(gust), rainP: Math.round(rainP), temp: Math.round(temp), kp: parseFloat(hourKp.toFixed(1)) });
     }
     return items;
-  }, [weather, kpIndex]);
+  }, [weather, kpIndex, kpForecast]);
 
   const dailyItems: DayItem[] = useMemo(() => {
     if (!weather?.daily?.time) return [];
@@ -80,9 +85,10 @@ export default function PrevisaoPage() {
             const hg = weather.hourly.wind_gusts_10m?.[h] ?? 0;
             const hr = weather.hourly.precipitation_probability?.[h] ?? 0;
             const ht = weather.hourly.temperature_2m?.[h] ?? 20;
-            const hkp = (isToday || isTomorrow) ? kpIndex : 0;
+            // Kp variável da previsão NOAA (cobre 3 dias), depois assume 0
+            const hkp = kpForecast.length > 0 ? getKpForTime(kpForecast, weather.hourly.time[h]) : ((isToday || isTomorrow) ? kpIndex : 0);
             const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht, kp: hkp });
-            dayHours.push({ time: weather.hourly.time[h], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: hres.score, level: hres.level, wind: Math.round(hw), gust: Math.round(hg), rainP: Math.round(hr), temp: Math.round(ht), kp: hkp });
+            dayHours.push({ time: weather.hourly.time[h], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: hres.score, level: hres.level, wind: Math.round(hw), gust: Math.round(hg), rainP: Math.round(hr), temp: Math.round(ht), kp: parseFloat(hkp.toFixed(1)) });
           }
         }
       }
@@ -103,7 +109,7 @@ export default function PrevisaoPage() {
       const displayLevel: Level = displayScore >= 70 ? "good" : displayScore >= 45 ? "warn" : "risk";
       return { date: dateStr, dayLabel, avgScore: displayScore, bestScore, bestWindow, level: displayLevel, minTemp: minT, maxTemp: maxT, maxWind: maxW, maxGust: maxG, maxRain: maxR, hours: dayHours };
     });
-  }, [weather, kpIndex]);
+  }, [weather, kpIndex, kpForecast]);
 
   if (loading || shared.loading) {
     return (

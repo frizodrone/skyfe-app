@@ -119,7 +119,6 @@ export async function fetchKpIndex(): Promise<{ kp: number; timestamp: string }>
     );
     if (!res.ok) throw new Error("Kp fetch failed");
     const data = await res.json();
-    // Data is array of objects, last entry is most recent
     if (data && data.length > 0) {
       const latest = data[data.length - 1];
       return {
@@ -127,8 +126,53 @@ export async function fetchKpIndex(): Promise<{ kp: number; timestamp: string }>
         timestamp: latest.time_tag || "",
       };
     }
-  } catch {
-    // silent — Kp is supplementary
-  }
+  } catch {}
   return { kp: 0, timestamp: "" };
+}
+
+/* ═══════════════════════════════════════════
+   KP FORECAST — NOAA 3-day prediction
+   Retorna array de { time: string, kp: number }
+   com blocos de 3h para os próximos 3 dias
+   ═══════════════════════════════════════════ */
+export type KpForecastItem = { time: string; kp: number };
+
+export async function fetchKpForecast(): Promise<KpForecastItem[]> {
+  try {
+    const res = await fetch(
+      "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
+    );
+    if (!res.ok) throw new Error("Kp forecast failed");
+    const data = await res.json();
+    // Format: array of [time_tag, kp, observed/predicted, noaa_scale]
+    // Ex: ["2026-04-03 00:00:00", "2.67", "predicted", ""]
+    if (data && Array.isArray(data)) {
+      return data
+        .filter((row: any) => Array.isArray(row) && row.length >= 2 && row[0] !== "time_tag")
+        .map((row: any) => ({
+          time: row[0],
+          kp: parseFloat(row[1]) || 0,
+        }));
+    }
+  } catch {}
+  return [];
+}
+
+/**
+ * Retorna o Kp previsto para uma data/hora específica.
+ * Busca o bloco de 3h mais próximo na previsão.
+ */
+export function getKpForTime(forecast: KpForecastItem[], targetTime: string): number {
+  if (!forecast.length) return 0;
+  const target = new Date(targetTime).getTime();
+  let closest = forecast[0];
+  let minDiff = Infinity;
+  for (const item of forecast) {
+    const diff = Math.abs(new Date(item.time).getTime() - target);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = item;
+    }
+  }
+  return closest.kp;
 }
