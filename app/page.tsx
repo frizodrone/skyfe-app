@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { fetchWeather, reverseGeocode, searchCities, fetchKpIndex } from "@/lib/weather";
 import { calculateFlightScore, getRiskNote, getMetricLevel } from "@/lib/score";
-import AuthGuard from "@/lib/AuthGuard";
+import AuthGuard, { useIsLoggedIn, LoginPromptModal } from "@/lib/AuthGuard";
 import { supabase } from "@/lib/supabase";
 
 type Level = "good" | "warn" | "risk";
@@ -221,6 +221,9 @@ function HomeContent() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [savingFav, setSavingFav] = useState(false);
   const [kpIndex, setKpIndex] = useState(0);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginFeature, setLoginFeature] = useState("");
+  const isLoggedIn = useIsLoggedIn();
 
   const loadWeather = useCallback(async (lat: number, lon: number, name?: string) => {
     setLoading(true); setError("");
@@ -262,6 +265,11 @@ function HomeContent() {
   };
 
   const toggleFavorite = async () => {
+    if (!isLoggedIn) {
+      setLoginFeature("favoritos");
+      setShowLoginModal(true);
+      return;
+    }
     setSavingFav(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -431,9 +439,12 @@ function HomeContent() {
             <button onClick={() => setShowSearch(true)} className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]">
               <Search size={19} />
             </button>
-            <Link href="/configuracoes" className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]">
+            <button onClick={() => {
+              if (!isLoggedIn) { setLoginFeature("configurações de limites"); setShowLoginModal(true); }
+              else { window.location.href = "/configuracoes"; }
+            }} className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]">
               <Settings size={19} />
-            </Link>
+            </button>
           </div>
         </header>
 
@@ -540,10 +551,22 @@ function HomeContent() {
         </section>
 
         {/* ─── CTA Button ─── */}
-        <a href={`/analise?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}`}
+        <button onClick={() => {
+          if (!isLoggedIn) {
+            setLoginFeature("análise detalhada");
+            setShowLoginModal(true);
+          } else {
+            window.location.href = `/analise?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}`;
+          }
+        }}
           className="mb-6 block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
           Ver análise detalhada
-        </a>
+        </button>
+
+        {/* Login Prompt Modal */}
+        {showLoginModal && (
+          <LoginPromptModal feature={loginFeature} onClose={() => setShowLoginModal(false)} />
+        )}
 
         {/* ─── Bottom Nav ─── */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">
@@ -551,7 +574,7 @@ function HomeContent() {
             {[
               { icon: <Sun size={21} />, label: "Clima", active: true, href: "/" },
               { icon: <Map size={21} />, label: "Zonas", active: false, href: "/zonas" },
-              { icon: <Clock3 size={21} />, label: "Previsão", active: false, href: "/previsao" },
+              { icon: <Clock3 size={21} />, label: "Previsão", active: false, href: `/previsao?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}` },
               { icon: <User size={21} />, label: "Perfil", active: false, href: "/perfil" },
             ].map((tab) => (
               <Link key={tab.label} href={tab.href}

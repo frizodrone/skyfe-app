@@ -3,11 +3,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Sun, Clock3, Map, User, Layers, Plane, AlertTriangle,
-  ChevronDown, ChevronUp, X, LocateFixed, Minus, Plus, Search,
+  ChevronDown, ChevronUp, X, LocateFixed, Minus, Plus, Search, MapPin,
 } from "lucide-react";
 import Link from "next/link";
 import AuthGuard from "@/lib/AuthGuard";
-import { searchCities } from "@/lib/weather";
+import { searchCities, reverseGeocode } from "@/lib/weather";
 
 /* ═══════════════════════════════════════════════════════════
    TYPES
@@ -481,6 +481,7 @@ function ZonasMap() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const [locationName, setLocationName] = useState("Sua localização");
   const rangeCircleRef = useRef<any>(null);
 
   // Init map
@@ -590,7 +591,7 @@ function ZonasMap() {
     };
   }, []);
 
-  // Fetch airports
+  // Fetch airports + location name
   useEffect(() => {
     setLoadingAirports(true);
     fetchAirportsNear(userPos[0], userPos[1]).then((aps) => {
@@ -599,6 +600,10 @@ function ZonasMap() {
       const heliCount = aps.filter((a) => a.type === "heliport").length;
       setStats({ airports: aps.length - heliCount, heliports: heliCount });
       setLoadingAirports(false);
+    });
+    // Atualizar nome da localização
+    reverseGeocode(userPos[0], userPos[1]).then((name) => {
+      setLocationName(name);
     });
   }, [userPos]);
 
@@ -772,10 +777,24 @@ function ZonasMap() {
         </div>
       )}
 
-      {/* Top bar — info + legend side by side */}
-      <div className="absolute top-3 left-3 right-3 z-[1000] flex items-start justify-between">
-        {/* Info bar */}
-        <div className="flex items-center gap-2 rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 px-3 py-2 text-[11px] text-slate-300 shadow-lg backdrop-blur-xl">
+      {/* Top bar — localização + busca + info + legenda */}
+      <div className="absolute top-3 left-3 right-3 z-[1000] flex flex-col gap-2">
+        {/* Linha 1: Localização + Busca */}
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center gap-2 rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 px-3 py-2.5 shadow-lg backdrop-blur-xl">
+            <MapPin size={13} className="text-cyan-400 shrink-0" />
+            <span className="text-[12px] font-medium text-slate-200 truncate">{locationName}</span>
+          </div>
+          <button onClick={() => setShowSearch(!showSearch)}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-cyan-400 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]"
+            title="Buscar local">
+            <Search size={16} />
+          </button>
+          <Legend show={showLegend} onToggle={() => setShowLegend(!showLegend)} />
+        </div>
+
+        {/* Linha 2: Stats */}
+        <div className="flex items-center gap-2 self-start rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 px-3 py-1.5 text-[11px] text-slate-300 shadow-lg backdrop-blur-xl">
           <Plane size={12} className="text-cyan-400" />
           <span className="font-bold text-white">{stats.airports}</span>
           <span className="hidden min-[360px]:inline">aerop.</span>
@@ -784,18 +803,10 @@ function ZonasMap() {
           <span className="font-bold text-white">{stats.heliports}</span>
           <span className="hidden min-[360px]:inline">helip.</span>
         </div>
-
-        {/* Legend */}
-        <Legend show={showLegend} onToggle={() => setShowLegend(!showLegend)} />
       </div>
 
       {/* Controls */}
       <div className="absolute right-3 bottom-24 z-[1000] flex flex-col gap-2">
-        <button onClick={() => setShowSearch(!showSearch)}
-          className="grid h-11 w-11 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-cyan-400 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]"
-          title="Buscar local">
-          <Search size={17} />
-        </button>
         <button onClick={() => setMapStyle(mapStyle === "dark" ? "satellite" : "dark")}
           className="grid h-11 w-11 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-slate-300 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]"
           title={mapStyle === "dark" ? "Satélite" : "Escuro"}>
@@ -818,7 +829,7 @@ function ZonasMap() {
 
       {/* Search overlay */}
       {showSearch && (
-        <div className="absolute top-14 left-3 right-3 z-[1001]">
+        <div className="absolute top-[100px] left-3 right-3 z-[1001]">
           <div className="rounded-2xl border border-white/[0.1] bg-[#0a1222]/95 shadow-xl backdrop-blur-xl overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06]">
               <Search size={15} className="text-slate-500" />
@@ -849,7 +860,9 @@ function ZonasMap() {
                 {searchResults.map((r: any) => (
                   <button key={r.id} onClick={() => {
                     const latlng: [number, number] = [r.latitude, r.longitude];
+                    const name = [r.name, r.admin1, r.country].filter(Boolean).join(", ");
                     setUserPos(latlng);
+                    setLocationName(name);
                     leafletMap.current?.setView(latlng, 12, { animate: true });
                     setShowSearch(false); setSearchQuery(""); setSearchResults([]);
                   }}

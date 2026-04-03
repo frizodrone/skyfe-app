@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Wind, Zap, CloudRain, Thermometer, Activity,
-  Sun, Clock3, Map, User, ChevronDown,
+  Sun, Clock3, Map, User, ChevronDown, MapPin,
 } from "lucide-react";
 import Link from "next/link";
 import { calculateFlightScore } from "@/lib/score";
-import { fetchKpIndex } from "@/lib/weather";
-import AuthGuard from "@/lib/AuthGuard";
+import { fetchKpIndex, reverseGeocode } from "@/lib/weather";
 
 type Level = "good" | "warn" | "risk";
 
@@ -46,17 +46,31 @@ type DayItem = {
 };
 
 export default function PrevisaoWrapper() {
-  return <AuthGuard><Previsao /></AuthGuard>;
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
+        <div className="h-[3px] w-48 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="h-full w-full animate-loading-bar rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
+        </div>
+      </main>
+    }>
+      <PrevisaoContent />
+    </Suspense>
+  );
 }
 
-function Previsao() {
+function PrevisaoContent() {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"hours" | "days">("hours");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [kpIndex, setKpIndex] = useState(0);
+  const [locationName, setLocationName] = useState("");
+  const [currentLat, setCurrentLat] = useState(-23.55);
+  const [currentLon, setCurrentLon] = useState(-46.63);
 
-  const load = useCallback(async (lat: number, lon: number) => {
+  const load = useCallback(async (lat: number, lon: number, name?: string) => {
     try {
       const [res, kpData] = await Promise.all([
         fetch(`https://api.open-meteo.com/v1/forecast?${[
@@ -72,18 +86,39 @@ function Previsao() {
       const data = await res.json();
       setWeather(data);
       setKpIndex(kpData.kp);
+      setCurrentLat(lat);
+      setCurrentLon(lon);
+
+      if (name) {
+        setLocationName(name);
+      } else {
+        const geo = await reverseGeocode(lat, lon);
+        setLocationName(geo);
+      }
     } catch {}
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (!navigator.geolocation) { load(-23.55, -46.63); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => load(pos.coords.latitude, pos.coords.longitude),
-      () => load(-23.55, -46.63),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
-  }, [load]);
+    const paramLat = searchParams.get("lat");
+    const paramLon = searchParams.get("lon");
+    const paramName = searchParams.get("name");
+
+    if (paramLat && paramLon) {
+      load(
+        parseFloat(paramLat),
+        parseFloat(paramLon),
+        paramName ? decodeURIComponent(paramName) : undefined
+      );
+    } else {
+      if (!navigator.geolocation) { load(-23.55, -46.63); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => load(pos.coords.latitude, pos.coords.longitude),
+        () => load(-23.55, -46.63),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+  }, [load, searchParams]);
 
   const hourlyItems: HourItem[] = useMemo(() => {
     if (!weather?.hourly?.time) return [];
@@ -100,12 +135,9 @@ function Previsao() {
       items.push({
         time: weather.hourly.time[i],
         hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        score: res.score,
-        level: res.level,
-        wind: Math.round(wind),
-        gust: Math.round(gust),
-        rainP: Math.round(rainP),
-        temp: Math.round(temp),
+        score: res.score, level: res.level,
+        wind: Math.round(wind), gust: Math.round(gust),
+        rainP: Math.round(rainP), temp: Math.round(temp),
         kp: kpIndex,
       });
     }
@@ -121,10 +153,8 @@ function Previsao() {
       const d = new Date(dateStr + "T12:00:00");
       const today = new Date();
       const isToday = d.toDateString() === today.toDateString();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
       const isTomorrow = d.toDateString() === tomorrow.toDateString();
-
       const dayLabel = isToday ? "Hoje" : isTomorrow ? "Amanhã" : `${dayNames[d.getDay()]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
 
       const minT = Math.round(weather.daily.temperature_2m_min?.[i] ?? 0);
@@ -133,7 +163,6 @@ function Previsao() {
       const maxG = Math.round(weather.daily.wind_gusts_10m_max?.[i] ?? 0);
       const maxR = Math.round(weather.daily.precipitation_probability_max?.[i] ?? 0);
 
-      // Calcular scores por hora do dia
       const dayHours: HourItem[] = [];
       if (weather.hourly?.time) {
         for (let h = 0; h < weather.hourly.time.length; h++) {
@@ -143,7 +172,6 @@ function Previsao() {
             const hg = weather.hourly.wind_gusts_10m?.[h] ?? 0;
             const hr = weather.hourly.precipitation_probability?.[h] ?? 0;
             const ht = weather.hourly.temperature_2m?.[h] ?? 20;
-            // Kp só está disponível para hoje/amanhã na prática
             const hkp = (isToday || isTomorrow) ? kpIndex : 0;
             const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht, kp: hkp });
             dayHours.push({
@@ -151,56 +179,34 @@ function Previsao() {
               hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
               score: hres.score, level: hres.level,
               wind: Math.round(hw), gust: Math.round(hg),
-              rainP: Math.round(hr), temp: Math.round(ht),
-              kp: hkp,
+              rainP: Math.round(hr), temp: Math.round(ht), kp: hkp,
             });
           }
         }
       }
 
-      // Score do dia = média das melhores 6 horas consecutivas (janela ideal)
-      // Em vez de usar o pior cenário do dia
+      // Melhor janela de 6h consecutivas
       let bestScore = 0;
       let bestWindow = "";
       if (dayHours.length >= 2) {
-        const windowSize = Math.min(6, dayHours.length);
-        let maxAvg = 0;
-        let bestStartIdx = 0;
-        for (let s = 0; s <= dayHours.length - windowSize; s++) {
-          const windowSlice = dayHours.slice(s, s + windowSize);
-          const avg = windowSlice.reduce((sum, h) => sum + h.score, 0) / windowSize;
-          if (avg > maxAvg) {
-            maxAvg = avg;
-            bestStartIdx = s;
-          }
+        const ws = Math.min(6, dayHours.length);
+        let maxAvg = 0, bestIdx = 0;
+        for (let s = 0; s <= dayHours.length - ws; s++) {
+          const avg = dayHours.slice(s, s + ws).reduce((sum, h) => sum + h.score, 0) / ws;
+          if (avg > maxAvg) { maxAvg = avg; bestIdx = s; }
         }
         bestScore = Math.round(maxAvg);
-        bestWindow = `${dayHours[bestStartIdx].hour}–${dayHours[Math.min(bestStartIdx + windowSize - 1, dayHours.length - 1)].hour}`;
+        bestWindow = `${dayHours[bestIdx].hour}–${dayHours[Math.min(bestIdx + ws - 1, dayHours.length - 1)].hour}`;
       }
 
-      // Score exibido: ponderação entre melhor janela (70%) e média geral (30%)
-      const allScoresAvg = dayHours.length > 0
-        ? dayHours.reduce((sum, h) => sum + h.score, 0) / dayHours.length
-        : 0;
-      const displayScore = dayHours.length > 0
-        ? Math.round(bestScore * 0.7 + allScoresAvg * 0.3)
-        : 0;
-
+      const allAvg = dayHours.length > 0 ? dayHours.reduce((s, h) => s + h.score, 0) / dayHours.length : 0;
+      const displayScore = dayHours.length > 0 ? Math.round(bestScore * 0.7 + allAvg * 0.3) : 0;
       const displayLevel: Level = displayScore >= 70 ? "good" : displayScore >= 45 ? "warn" : "risk";
 
       return {
-        date: dateStr,
-        dayLabel,
-        avgScore: displayScore,
-        bestScore,
-        bestWindow,
-        level: displayLevel,
-        minTemp: minT,
-        maxTemp: maxT,
-        maxWind: maxW,
-        maxGust: maxG,
-        maxRain: maxR,
-        hours: dayHours,
+        date: dateStr, dayLabel, avgScore: displayScore, bestScore, bestWindow,
+        level: displayLevel, minTemp: minT, maxTemp: maxT,
+        maxWind: maxW, maxGust: maxG, maxRain: maxR, hours: dayHours,
       };
     });
   }, [weather, kpIndex]);
@@ -221,7 +227,7 @@ function Previsao() {
               <span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-[4px] bg-cyan-400 animate-pulse-dot" />
             </div>
           </div>
-          <h1 className="text-[28px] font-bold tracking-tight">Sky<span className="text-cyan-400">Fe</span></h1>
+          <h1 className="text-[28px] font-bold tracking-tight text-white">Sky<span className="text-cyan-400">Fe</span></h1>
           <div className="h-[3px] w-48 overflow-hidden rounded-full bg-white/[0.06]">
             <div className="h-full w-full animate-loading-bar rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
           </div>
@@ -239,12 +245,23 @@ function Previsao() {
 
       <div className="relative z-10 mx-auto w-full max-w-md px-5 pb-28 pt-6">
 
-        <header className="mb-8 flex items-center gap-4">
+        {/* Header com localização */}
+        <header className="mb-4 flex items-center gap-4">
           <Link href="/" className="grid h-11 w-11 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]">
             <ArrowLeft size={18} />
           </Link>
-          <h1 className="text-[24px] font-bold tracking-tight">Previsão completa</h1>
+          <div className="flex-1">
+            <h1 className="text-[24px] font-bold tracking-tight">Previsão completa</h1>
+          </div>
         </header>
+
+        {/* Localização */}
+        {locationName && (
+          <div className="mb-6 flex items-center justify-center gap-1.5">
+            <MapPin size={14} className="text-cyan-400" />
+            <p className="text-[14px] font-medium text-slate-300">{locationName}</p>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="mb-8 flex gap-3">
@@ -279,8 +296,7 @@ function Previsao() {
                 className="relative flex items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4 transition-all duration-200"
                 style={{
                   background: `linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)`,
-                  border: `1px solid ${LC[h.level]}18`,
-                  boxShadow: `0 0 12px ${LC[h.level]}06`,
+                  border: `1px solid ${LC[h.level]}18`, boxShadow: `0 0 12px ${LC[h.level]}06`,
                 }}
               >
                 <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full" style={{ background: LC[h.level], opacity: 0.6 }} />
@@ -315,8 +331,7 @@ function Previsao() {
                   className="relative flex w-full items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4 text-left transition-all duration-200"
                   style={{
                     background: `linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)`,
-                    border: `1px solid ${LC[day.level]}18`,
-                    boxShadow: `0 0 12px ${LC[day.level]}06`,
+                    border: `1px solid ${LC[day.level]}18`, boxShadow: `0 0 12px ${LC[day.level]}06`,
                   }}
                 >
                   <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full" style={{ background: LC[day.level], opacity: 0.6 }} />
@@ -331,7 +346,6 @@ function Previsao() {
                       <span className="inline-flex items-center gap-1"><Wind size={11} />{day.maxWind}</span>
                       <span className="inline-flex items-center gap-1"><CloudRain size={11} />{day.maxRain}%</span>
                     </div>
-                    {/* Melhor janela */}
                     {day.bestWindow && day.bestScore > 0 && (
                       <p className="mt-1.5 text-[11px] font-medium text-cyan-400/80">
                         Melhor janela: {day.bestWindow} (score {day.bestScore})
@@ -370,7 +384,7 @@ function Previsao() {
           {[
             { icon: <Sun size={21} />, label: "Clima", href: "/", active: false },
             { icon: <Map size={21} />, label: "Zonas", href: "/zonas", active: false },
-            { icon: <Clock3 size={21} />, label: "Previsão", href: "/previsao", active: true },
+            { icon: <Clock3 size={21} />, label: "Previsão", href: `/previsao?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(locationName)}`, active: true },
             { icon: <User size={21} />, label: "Perfil", href: "/perfil", active: false },
           ].map((tab) => (
             <Link key={tab.label} href={tab.href}
