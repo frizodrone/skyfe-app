@@ -86,12 +86,14 @@ export function calculateFlightScore(
     score -= Math.min(10, Math.round((temp - lim.maxTemp) * 2));
   }
 
-  // Índice Kp (até -20 pts)
-  // Kp 0-3: seguro | Kp 4: atenção | Kp 5+: risco
+  // Índice Kp (até -40 pts)
+  // Kp 0-3: seguro | Kp 4: atenção | Kp 5: tempestade | Kp 6+: severo
+  // Kp 5+ é fator crítico — sozinho deve levar o score para vermelho
   if (kp !== undefined && kp > 0) {
-    if (kp >= 6) score -= 20;
-    else if (kp >= 5) score -= 15;
-    else if (kp >= 4) score -= 8;
+    if (kp >= 7) score -= 40;      // Severo — score vai pra 0-30
+    else if (kp >= 6) score -= 35;  // Tempestade forte
+    else if (kp >= 5) score -= 30;  // Tempestade — score cai pra ~40 (vermelho)
+    else if (kp >= 4) score -= 10;  // Atenção
     // Kp 1-3: 0 pts — seguro conforme pesquisa DJI
   }
 

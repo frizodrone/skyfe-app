@@ -9,6 +9,7 @@ import {
 import { fetchWeather, reverseGeocode, searchCities, fetchKpIndex } from "@/lib/weather";
 import { calculateFlightScore, getRiskNote, getMetricLevel } from "@/lib/score";
 import AuthGuard, { useIsLoggedIn, LoginPromptModal } from "@/lib/AuthGuard";
+import { useSharedLocation } from "@/lib/useSharedLocation";
 import { supabase } from "@/lib/supabase";
 
 type Level = "good" | "warn" | "risk";
@@ -224,6 +225,7 @@ function HomeContent() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginFeature, setLoginFeature] = useState("");
   const isLoggedIn = useIsLoggedIn();
+  const shared = useSharedLocation();
 
   const loadWeather = useCallback(async (lat: number, lon: number, name?: string) => {
     setLoading(true); setError("");
@@ -233,15 +235,12 @@ function HomeContent() {
       setWeather(data);
       const c = data.current;
       const rp = data.hourly?.precipitation_probability?.[0] ?? 0;
-      // If actually raining, use 100% as rain probability for score
       const effectiveRain = (c.precipitation ?? 0) > 0 ? Math.max(rp, 80) : rp;
-      // Fetch Kp index in parallel
       const kpData = await fetchKpIndex();
       setKpIndex(kpData.kp);
       const res = calculateFlightScore({ wind: c.wind_speed_10m, gust: c.wind_gusts_10m, rainProb: effectiveRain, temp: c.temperature_2m, kp: kpData.kp });
       setScore(res.score); setLabel(res.label); setLevel(res.level);
       if (name) { setPlaceName(name); } else { const geo = await reverseGeocode(lat, lon); setPlaceName(geo); }
-      // Check if this location is a favorite
       checkFavorite(lat, lon);
     } catch { setError("Erro ao carregar clima."); }
     setLoading(false);
@@ -295,36 +294,21 @@ function HomeContent() {
     setSavingFav(false);
   };
 
-  const loadFromGeo = useCallback(() => {
-    if (!navigator.geolocation) { loadWeather(-23.55, -46.63, "São Paulo, BR"); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => loadWeather(pos.coords.latitude, pos.coords.longitude),
-      () => loadWeather(-23.55, -46.63, "São Paulo, BR"),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
-  }, [loadWeather]);
-
+  // Carregar clima quando localização compartilhada mudar
   useEffect(() => {
-    // Verificar se veio coordenadas via URL (do mapa de zonas)
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const urlLat = params.get("lat");
-      const urlLon = params.get("lon");
-      if (urlLat && urlLon) {
-        loadWeather(parseFloat(urlLat), parseFloat(urlLon));
-        // Limpar URL sem recarregar
-        window.history.replaceState({}, "", "/");
-        return;
-      }
-    }
-    loadFromGeo();
-  }, [loadFromGeo, loadWeather]);
+    if (shared.loading || !shared.location) return;
+    loadWeather(shared.location.lat, shared.location.lon, shared.location.name);
+  }, [shared.location, shared.loading, loadWeather]);
 
   const handleSearchSelect = useCallback((result: any) => {
-    if (!result) { loadFromGeo(); return; }
+    if (!result) {
+      // "Usar minha localização" — limpar pesquisa e voltar ao GPS
+      shared.clearToGPS();
+      return;
+    }
     const name = [result.name, result.admin1, result.country].filter(Boolean).join(", ");
-    loadWeather(result.latitude, result.longitude, name);
-  }, [loadWeather, loadFromGeo]);
+    shared.setSearchLocation(result.latitude, result.longitude, name);
+  }, [shared]);
 
   /* ── hourly data ── */
   const hourly: HourlyItem[] = useMemo(() => {
@@ -452,6 +436,13 @@ function HomeContent() {
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-2">
             <p className="inline-flex items-center gap-1.5 text-[17px] font-medium text-slate-100">{placeName} <MapPin size={14} className="text-cyan-400" /></p>
+            {/* Botão (x) para voltar ao GPS — só aparece quando é pesquisa */}
+            {shared.location && !shared.location.isGPS && (
+              <button onClick={() => shared.clearToGPS()}
+                className="grid h-6 w-6 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-slate-400 transition hover:bg-white/[0.08] hover:text-white">
+                <X size={12} />
+              </button>
+            )}
             <button onClick={toggleFavorite} disabled={savingFav}
               className="transition hover:scale-110 disabled:opacity-50">
               <Star size={16} className={isFavorite ? "fill-amber-400 text-amber-400" : "text-slate-600"} />

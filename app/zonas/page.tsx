@@ -8,6 +8,7 @@ import {
 import Link from "next/link";
 import AuthGuard from "@/lib/AuthGuard";
 import { searchCities, reverseGeocode } from "@/lib/weather";
+import { useSharedLocation } from "@/lib/useSharedLocation";
 
 /* ═══════════════════════════════════════════════════════════
    TYPES
@@ -483,6 +484,7 @@ function ZonasMap() {
   const [searching, setSearching] = useState(false);
   const [locationName, setLocationName] = useState("Sua localização");
   const rangeCircleRef = useRef<any>(null);
+  const shared = useSharedLocation();
 
   // Init map
   useEffect(() => {
@@ -550,6 +552,12 @@ function ZonasMap() {
       });
 
       // Clique no mapa → popup com condições meteorológicas
+      // Usar evento global para comunicar com React
+      (window as any).__skyfeMapClick = (lat: number, lng: number) => {
+        shared.setSearchLocation(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        window.location.href = "/";
+      };
+
       map.on("click", (e: any) => {
         const { lat, lng } = e.latlng;
         const popup = L.popup()
@@ -559,25 +567,33 @@ function ZonasMap() {
               <p style="font-size:12px;color:#64748b;margin:0 0 8px;">
                 ${lat.toFixed(4)}, ${lng.toFixed(4)}
               </p>
-              <a href="/?lat=${lat}&lon=${lng}"
-                 style="display:inline-block;padding:8px 16px;border-radius:99px;background:linear-gradient(135deg,#22d3ee,#34d399);color:#04090f;font-size:13px;font-weight:600;text-decoration:none;">
+              <button onclick="window.__skyfeMapClick(${lat}, ${lng})"
+                 style="display:inline-block;padding:8px 16px;border-radius:99px;background:linear-gradient(135deg,#22d3ee,#34d399);color:#04090f;font-size:13px;font-weight:600;border:none;cursor:pointer;">
                 Ver condições de voo
-              </a>
+              </button>
             </div>
           `)
           .openOn(map);
       });
 
-      navigator.geolocation?.getCurrentPosition(
-        (pos) => {
-          if (!mounted) return;
-          const latlng: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-          setUserPos(latlng);
-          map.setView(latlng, 11);
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
+      // Inicializar posição a partir da localização compartilhada
+      if (shared.location) {
+        const latlng: [number, number] = [shared.location.lat, shared.location.lon];
+        setUserPos(latlng);
+        setLocationName(shared.location.name);
+        map.setView(latlng, 11);
+      } else {
+        navigator.geolocation?.getCurrentPosition(
+          (pos) => {
+            if (!mounted) return;
+            const latlng: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+            setUserPos(latlng);
+            map.setView(latlng, 11);
+          },
+          () => {},
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      }
     };
 
     init();
@@ -784,6 +800,25 @@ function ZonasMap() {
           <div className="flex flex-1 items-center gap-2 rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 px-3 py-2.5 shadow-lg backdrop-blur-xl">
             <MapPin size={13} className="text-cyan-400 shrink-0" />
             <span className="text-[12px] font-medium text-slate-200 truncate">{locationName}</span>
+            {/* Botão (x) para voltar ao GPS */}
+            {shared.location && !shared.location.isGPS && (
+              <button onClick={() => {
+                shared.clearToGPS();
+                // Voltar mapa para GPS
+                navigator.geolocation?.getCurrentPosition(
+                  (pos) => {
+                    const latlng: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+                    setUserPos(latlng);
+                    leafletMap.current?.setView(latlng, 11, { animate: true });
+                  },
+                  () => {},
+                  { enableHighAccuracy: true }
+                );
+              }}
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-slate-400 transition hover:bg-white/[0.12] hover:text-white">
+                <X size={10} />
+              </button>
+            )}
           </div>
           <button onClick={() => setShowSearch(!showSearch)}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-cyan-400 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]"
@@ -863,6 +898,7 @@ function ZonasMap() {
                     const name = [r.name, r.admin1, r.country].filter(Boolean).join(", ");
                     setUserPos(latlng);
                     setLocationName(name);
+                    shared.setSearchLocation(r.latitude, r.longitude, name);
                     leafletMap.current?.setView(latlng, 12, { animate: true });
                     setShowSearch(false); setSearchQuery(""); setSearchResults([]);
                   }}
