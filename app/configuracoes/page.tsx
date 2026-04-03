@@ -17,8 +17,8 @@ type Config = {
 };
 
 const DEFAULTS: Config = {
-  maxWind: 20,
-  maxGust: 30,
+  maxWind: 30,
+  maxGust: 40,
   maxRain: 50,
   minTemp: 5,
   maxTemp: 38,

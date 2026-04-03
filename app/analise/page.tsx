@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import {
   ArrowLeft, Wind, Zap, CloudRain, Thermometer, Activity,
   ShieldCheck, ShieldAlert, ShieldX, TrendingDown, TrendingUp, Minus,
 } from "lucide-react";
 import { fetchWeather, fetchKpIndex } from "@/lib/weather";
-import { calculateFlightScore, getRiskNote } from "@/lib/score";
+import { calculateFlightScore, getRiskNote, getMetricLevel } from "@/lib/score";
 import Link from "next/link";
 import AuthGuard from "@/lib/AuthGuard";
 
@@ -84,30 +86,31 @@ function FactorCard({ title, icon, note, level, impact, riskLabel }: {
   );
 }
 
-export default function AnaliseWrapper() {
-  return <AuthGuard><Analise /></AuthGuard>;
-}
-
-function Analise() {
+function AnaliseContent() {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<any>(null);
   const [score, setScore] = useState(0);
   const [label, setLabel] = useState("...");
   const [level, setLevel] = useState<Level>("good");
-  const [kpValue, setKpValue] = useState(0);
+  const [kpIndex, setKpIndex] = useState(0);
+  const [locationName, setLocationName] = useState("");
 
   const load = useCallback(async (lat: number, lon: number) => {
     try {
-      const data = await fetchWeather(lat, lon);
+      const [data, kpData] = await Promise.all([
+        fetchWeather(lat, lon),
+        fetchKpIndex(),
+      ]);
       setWeather(data);
+      setKpIndex(kpData.kp);
       const c = data.current;
       const rp = data.hourly?.precipitation_probability?.[0] ?? 0;
-      const kpData = await fetchKpIndex();
-      setKpValue(kpData.kp);
+      const effectiveRain = (c.precipitation ?? 0) > 0 ? Math.max(rp, 80) : rp;
       const res = calculateFlightScore({
         wind: c.wind_speed_10m,
         gust: c.wind_gusts_10m,
-        rainProb: rp,
+        rainProb: effectiveRain,
         temp: c.temperature_2m,
         kp: kpData.kp,
       });
@@ -119,42 +122,66 @@ function Analise() {
   }, []);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      load(-23.55, -46.63);
-      return;
+    // BUG FIX: Usar coordenadas da URL (passadas da busca) em vez de sempre usar GPS
+    const paramLat = searchParams.get("lat");
+    const paramLon = searchParams.get("lon");
+    const paramName = searchParams.get("name");
+
+    if (paramName) setLocationName(decodeURIComponent(paramName));
+
+    if (paramLat && paramLon) {
+      load(parseFloat(paramLat), parseFloat(paramLon));
+    } else {
+      // Fallback para GPS
+      if (!navigator.geolocation) {
+        load(-23.55, -46.63);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => load(pos.coords.latitude, pos.coords.longitude),
+        () => load(-23.55, -46.63),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => load(pos.coords.latitude, pos.coords.longitude),
-      () => load(-23.55, -46.63),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
-  }, [load]);
+  }, [load, searchParams]);
 
   const wind = weather ? Math.round(weather.current.wind_speed_10m) : 0;
   const gust = weather ? Math.round(weather.current.wind_gusts_10m) : 0;
   const rainP = weather ? (weather.hourly?.precipitation_probability?.[0] ?? 0) : 0;
   const temp = weather ? Math.round(weather.current.temperature_2m) : 0;
 
-  const windLevel: Level = wind <= 10 ? "good" : wind <= 20 ? "warn" : "risk";
-  const gustLevel: Level = gust <= 15 ? "good" : gust <= 25 ? "warn" : "risk";
-  const rainLevel: Level = rainP <= 20 ? "good" : rainP <= 50 ? "warn" : "risk";
-  const tempLevel: Level = temp >= 5 && temp <= 35 ? "good" : temp >= 0 && temp <= 38 ? "warn" : "risk";
-  const kpLevel: Level = kpValue <= 2 ? "good" : kpValue <= 4 ? "warn" : "risk";
+  // Usar getMetricLevel centralizado
+  const windLevel = getMetricLevel("wind", wind);
+  const gustLevel = getMetricLevel("gust", gust);
+  const rainLevel = getMetricLevel("rain", rainP);
+  const tempLevel = getMetricLevel("temp", temp);
+  const kpLevel = getMetricLevel("kp", kpIndex);
 
-  const windImpact = wind <= 10 ? ("positive" as const) : wind <= 20 ? ("neutral" as const) : ("negative" as const);
-  const gustImpact = gust <= 15 ? ("positive" as const) : gust <= 25 ? ("neutral" as const) : ("negative" as const);
-  const rainImpact = rainP <= 20 ? ("positive" as const) : rainP <= 50 ? ("neutral" as const) : ("negative" as const);
-  const tempImpact = temp >= 5 && temp <= 35 ? ("positive" as const) : ("neutral" as const);
-  const kpImpact = kpValue <= 2 ? ("positive" as const) : kpValue <= 4 ? ("neutral" as const) : ("negative" as const);
+  const getImpact = (lvl: Level) => lvl === "good" ? "positive" as const : lvl === "risk" ? "negative" as const : "neutral" as const;
 
   const ShieldIcon = level === "good" ? ShieldCheck : level === "warn" ? ShieldAlert : ShieldX;
 
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 rounded-full border-[3px] border-white/[0.06] border-t-cyan-400 animate-spin-loader" />
-          <p className="text-[15px] text-slate-400">Analisando condições...</p>
+        <div className="pointer-events-none fixed inset-0 opacity-80">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,_rgba(45,204,255,0.1),_transparent_50%)]" />
+        </div>
+        <div className="relative z-10 flex flex-col items-center gap-6">
+          <div className="grid h-20 w-20 place-items-center rounded-[24px] border border-cyan-400/20 bg-white/[0.03] shadow-[0_0_40px_rgba(45,204,255,0.15)]">
+            <div className="relative h-[30px] w-[30px]">
+              <span className="absolute left-0 top-0 h-[10px] w-[10px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0s" }} />
+              <span className="absolute right-0 top-0 h-[10px] w-[10px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0.2s" }} />
+              <span className="absolute left-0 bottom-0 h-[10px] w-[10px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0.4s" }} />
+              <span className="absolute right-0 bottom-0 h-[10px] w-[10px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0.6s" }} />
+              <span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-[4px] bg-cyan-400 animate-pulse-dot" />
+            </div>
+          </div>
+          <h1 className="text-[28px] font-bold tracking-tight">Sky<span className="text-cyan-400">Fe</span></h1>
+          <div className="h-[3px] w-48 overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="h-full w-full animate-loading-bar rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
+          </div>
+          <p className="text-[13px] text-slate-500">Analisando condições...</p>
         </div>
       </main>
     );
@@ -176,7 +203,12 @@ function Analise() {
           >
             <ArrowLeft size={18} />
           </Link>
-          <h1 className="text-[24px] font-bold tracking-tight">Análise detalhada</h1>
+          <div>
+            <h1 className="text-[24px] font-bold tracking-tight">Análise detalhada</h1>
+            {locationName && (
+              <p className="text-[12px] text-slate-500 mt-0.5">{locationName}</p>
+            )}
+          </div>
         </header>
 
         {/* Score summary */}
@@ -208,11 +240,11 @@ function Analise() {
             pontuação proporcionalmente ao risco que representa para a operação do drone.
           </p>
 
-          <ScoreBar label="Vento médio" icon={<Wind size={17} />} value={wind} max={40} unit="km/h" level={windLevel} />
-          <ScoreBar label="Rajada máxima" icon={<Zap size={17} />} value={gust} max={50} unit="km/h" level={gustLevel} />
+          <ScoreBar label="Vento médio" icon={<Wind size={17} />} value={wind} max={50} unit="km/h" level={windLevel} />
+          <ScoreBar label="Rajada máxima" icon={<Zap size={17} />} value={gust} max={60} unit="km/h" level={gustLevel} />
           <ScoreBar label="Probabilidade de chuva" icon={<CloudRain size={17} />} value={rainP} max={100} unit="%" level={rainLevel} />
           <ScoreBar label="Temperatura" icon={<Thermometer size={17} />} value={temp} max={45} unit="°C" level={tempLevel} />
-          <ScoreBar label="Índice Kp (geomagnético)" icon={<Activity size={17} />} value={Math.round(kpValue * 10) / 10} max={9} unit="" level={kpLevel} />
+          <ScoreBar label="Índice Kp (GPS)" icon={<Activity size={17} />} value={parseFloat(kpIndex.toFixed(1))} max={9} unit="" level={kpLevel} />
         </section>
 
         {/* Factor details */}
@@ -222,17 +254,17 @@ function Analise() {
             <FactorCard
               title="Vento"
               icon={<Wind size={17} />}
-              note={`${wind} km/h — ${getRiskNote("wind", wind).toLowerCase()}. ${wind <= 10 ? "Condições ideais para voo estável." : wind <= 20 ? "Voo possível com atenção extra." : "Risco alto de instabilidade."}`}
+              note={`${wind} km/h — ${getRiskNote("wind", wind).toLowerCase()}. ${wind <= 15 ? "Condições ideais para voo estável." : wind <= 29 ? "Voo possível com atenção." : "Vento forte, avalie o risco."}`}
               level={windLevel}
-              impact={windImpact}
+              impact={getImpact(windLevel)}
               riskLabel={getRiskNote("wind", wind)}
             />
             <FactorCard
               title="Rajada"
               icon={<Zap size={17} />}
-              note={`${gust} km/h — ${getRiskNote("gust", gust).toLowerCase()}. ${gust <= 15 ? "Sem variações bruscas." : gust <= 25 ? "Possíveis oscilações." : "Rajadas podem derrubar o drone."}`}
+              note={`${gust} km/h — ${getRiskNote("gust", gust).toLowerCase()}. ${gust <= 20 ? "Sem variações bruscas." : gust <= 34 ? "Possíveis oscilações." : "Rajadas podem causar instabilidade."}`}
               level={gustLevel}
-              impact={gustImpact}
+              impact={getImpact(gustLevel)}
               riskLabel={getRiskNote("gust", gust)}
             />
             <FactorCard
@@ -240,7 +272,7 @@ function Analise() {
               icon={<CloudRain size={17} />}
               note={`${rainP}% de chance — ${getRiskNote("rain", rainP).toLowerCase()}. ${rainP <= 20 ? "Céu limpo, pode voar." : rainP <= 50 ? "Monitore o céu." : "Alto risco de dano ao equipamento."}`}
               level={rainLevel}
-              impact={rainImpact}
+              impact={getImpact(rainLevel)}
               riskLabel={getRiskNote("rain", rainP)}
             />
             <FactorCard
@@ -248,16 +280,16 @@ function Analise() {
               icon={<Thermometer size={17} />}
               note={`${temp}°C — ${getRiskNote("temp", temp).toLowerCase()}. ${temp >= 5 && temp <= 35 ? "Faixa segura para bateria e eletrônicos." : "Temperatura pode afetar performance."}`}
               level={tempLevel}
-              impact={tempImpact}
+              impact={getImpact(tempLevel)}
               riskLabel={getRiskNote("temp", temp)}
             />
             <FactorCard
               title="Índice Kp"
               icon={<Activity size={17} />}
-              note={`Kp ${kpValue.toFixed(1)} — ${getRiskNote("kp", kpValue).toLowerCase()}. ${kpValue <= 2 ? "GPS estável, sem interferência." : kpValue <= 4 ? "Possível interferência no GPS." : "Risco de perda de sinal GPS."}`}
+              note={`Kp ${kpIndex.toFixed(1)} — ${getRiskNote("kp", kpIndex).toLowerCase()}. ${kpIndex <= 3 ? "GPS estável, sem interferência." : kpIndex <= 4 ? "Possível lentidão no lock GPS." : "Tempestade geomagnética pode afetar GPS."}`}
               level={kpLevel}
-              impact={kpImpact}
-              riskLabel={getRiskNote("kp", kpValue)}
+              impact={getImpact(kpLevel)}
+              riskLabel={getRiskNote("kp", kpIndex)}
             />
           </div>
         </section>
@@ -269,19 +301,19 @@ function Analise() {
             <div className="flex items-center gap-3">
               <span className="h-[11px] w-[11px] rounded-full bg-[#2dffb3]" />
               <span className="text-slate-300">
-                <span className="font-medium text-[#2dffb3]">75–100</span> — Condições ideais para voo
+                <span className="font-medium text-[#2dffb3]">70–100</span> — Condições ideais para voo
               </span>
             </div>
             <div className="flex items-center gap-3">
               <span className="h-[11px] w-[11px] rounded-full bg-[#ffd84d]" />
               <span className="text-slate-300">
-                <span className="font-medium text-[#ffd84d]">50–74</span> — Voo possível com cautela
+                <span className="font-medium text-[#ffd84d]">45–69</span> — Voo possível com cautela
               </span>
             </div>
             <div className="flex items-center gap-3">
               <span className="h-[11px] w-[11px] rounded-full bg-[#ff5a5f]" />
               <span className="text-slate-300">
-                <span className="font-medium text-[#ff5a5f]">0–49</span> — Voo não recomendado
+                <span className="font-medium text-[#ff5a5f]">0–44</span> — Voo não recomendado
               </span>
             </div>
           </div>
@@ -296,5 +328,21 @@ function Analise() {
         </Link>
       </div>
     </main>
+  );
+}
+
+export default function AnaliseWrapper() {
+  return (
+    <AuthGuard>
+      <Suspense fallback={
+        <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 rounded-full border-[3px] border-white/[0.06] border-t-cyan-400 animate-spin-loader" />
+          </div>
+        </main>
+      }>
+        <AnaliseContent />
+      </Suspense>
+    </AuthGuard>
   );
 }

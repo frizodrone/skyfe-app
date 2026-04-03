@@ -7,7 +7,7 @@ import {
   Sun, Map, Clock3, User, Eye, Droplets, MapPin, LocateFixed, X, Star, Activity,
 } from "lucide-react";
 import { fetchWeather, reverseGeocode, searchCities, fetchKpIndex } from "@/lib/weather";
-import { calculateFlightScore, getRiskNote } from "@/lib/score";
+import { calculateFlightScore, getRiskNote, getMetricLevel } from "@/lib/score";
 import AuthGuard from "@/lib/AuthGuard";
 import { supabase } from "@/lib/supabase";
 
@@ -296,7 +296,21 @@ function HomeContent() {
     );
   }, [loadWeather]);
 
-  useEffect(() => { loadFromGeo(); }, [loadFromGeo]);
+  useEffect(() => {
+    // Verificar se veio coordenadas via URL (do mapa de zonas)
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlLat = params.get("lat");
+      const urlLon = params.get("lon");
+      if (urlLat && urlLon) {
+        loadWeather(parseFloat(urlLat), parseFloat(urlLon));
+        // Limpar URL sem recarregar
+        window.history.replaceState({}, "", "/");
+        return;
+      }
+    }
+    loadFromGeo();
+  }, [loadFromGeo, loadWeather]);
 
   const handleSearchSelect = useCallback((result: any) => {
     if (!result) { loadFromGeo(); return; }
@@ -317,12 +331,11 @@ function HomeContent() {
         gust: weather.hourly.wind_gusts_10m?.[i] ?? 0,
         rainProb: weather.hourly.precipitation_probability?.[i] ?? 0,
         temp: weather.hourly.temperature_2m?.[i] ?? 20,
-        kp: kpIndex,
       });
       items.push({ time: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), ...res });
     }
     return items;
-  }, [weather, kpIndex]);
+  }, [weather]);
 
   const bestWindow = useMemo(() => {
     const good = hourly.filter((h) => h.level === "good");
@@ -352,15 +365,6 @@ function HomeContent() {
   const rainNote = rainNow > 0 ? `Chovendo (${rainP}% prob.)` : getRiskNote("rain", rainP);
 
   /* ── per-metric risk level ── */
-  function getMetricLevel(type: string, val: number): Level {
-    if (type === "wind") return val <= 15 ? "good" : val <= 25 ? "warn" : "risk";
-    if (type === "gust") return val <= 20 ? "good" : val <= 35 ? "warn" : "risk";
-    if (type === "rain") return val <= 20 ? "good" : val <= 50 ? "warn" : "risk";
-    if (type === "temp") return val >= 5 && val <= 38 ? "good" : val >= 0 && val <= 42 ? "warn" : "risk";
-    if (type === "kp") return val <= 2 ? "good" : val <= 4 ? "warn" : "risk";
-    return "good";
-  }
-
   const metrics = [
     { icon: <Wind size={20} />, title: "VENTO\nMÉDIO", value: weather ? `${wind}` : "--", unit: "km/h", note: getRiskNote("wind", wind), metricLevel: getMetricLevel("wind", wind) },
     { icon: <Zap size={20} />, title: "RAJADA\nMÁX", value: weather ? `${gust}` : "--", unit: "km/h", note: getRiskNote("gust", gust), metricLevel: getMetricLevel("gust", gust) },
@@ -369,13 +373,32 @@ function HomeContent() {
     { icon: <Activity size={20} />, title: "ÍNDICE\nKP", value: weather ? `${kpIndex.toFixed(1)}` : "--", unit: "", note: getRiskNote("kp", kpIndex), metricLevel: getMetricLevel("kp", kpIndex) },
   ];
 
-  /* ── loading screen ── */
+  /* ── Splash Screen SkyFe branded ── */
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 rounded-full border-[3px] border-white/[0.06] border-t-cyan-400 animate-spin-loader" />
-          <p className="text-[15px] text-slate-400">Carregando clima...</p>
+        <div className="pointer-events-none fixed inset-0 opacity-80">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,_rgba(45,204,255,0.1),_transparent_50%)]" />
+        </div>
+        <div className="relative z-10 flex flex-col items-center gap-6">
+          {/* Logo animada */}
+          <div className="relative">
+            <div className="grid h-20 w-20 place-items-center rounded-[24px] border border-cyan-400/20 bg-white/[0.03] shadow-[0_0_40px_rgba(45,204,255,0.15)]">
+              <div className="relative h-[30px] w-[30px]">
+                <span className="absolute left-0 top-0 h-[10px] w-[10px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0s" }} />
+                <span className="absolute right-0 top-0 h-[10px] w-[10px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0.2s" }} />
+                <span className="absolute left-0 bottom-0 h-[10px] w-[10px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0.4s" }} />
+                <span className="absolute right-0 bottom-0 h-[10px] w-[10px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0.6s" }} />
+                <span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-[4px] bg-cyan-400 animate-pulse-dot" />
+              </div>
+            </div>
+          </div>
+          <h1 className="text-[28px] font-bold tracking-tight">Sky<span className="text-cyan-400">Fe</span></h1>
+          {/* Loading bar */}
+          <div className="h-[3px] w-48 overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="h-full w-full animate-loading-bar rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
+          </div>
+          <p className="text-[13px] text-slate-500">Carregando condições de voo...</p>
         </div>
       </main>
     );
@@ -517,7 +540,7 @@ function HomeContent() {
         </section>
 
         {/* ─── CTA Button ─── */}
-        <a href="/analise"
+        <a href={`/analise?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}`}
           className="mb-6 block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
           Ver análise detalhada
         </a>

@@ -532,6 +532,41 @@ function ZonasMap() {
         }
       });
 
+      // Recarregar aeroportos ao navegar no mapa
+      let moveTimer: ReturnType<typeof setTimeout>;
+      map.on("moveend", () => {
+        clearTimeout(moveTimer);
+        moveTimer = setTimeout(() => {
+          const center = map.getCenter();
+          // Só recarrega se moveu significativamente (> 30km)
+          const dist = Math.sqrt(
+            Math.pow(center.lat - userPos[0], 2) + Math.pow(center.lng - userPos[1], 2)
+          ) * 111; // aprox km
+          if (dist > 30) {
+            setUserPos([center.lat, center.lng]);
+          }
+        }, 800);
+      });
+
+      // Clique no mapa → popup com condições meteorológicas
+      map.on("click", (e: any) => {
+        const { lat, lng } = e.latlng;
+        const popup = L.popup()
+          .setLatLng(e.latlng)
+          .setContent(`
+            <div style="text-align:center;font-family:-apple-system,sans-serif;min-width:180px;">
+              <p style="font-size:12px;color:#64748b;margin:0 0 8px;">
+                ${lat.toFixed(4)}, ${lng.toFixed(4)}
+              </p>
+              <a href="/?lat=${lat}&lon=${lng}"
+                 style="display:inline-block;padding:8px 16px;border-radius:99px;background:linear-gradient(135deg,#22d3ee,#34d399);color:#04090f;font-size:13px;font-weight:600;text-decoration:none;">
+                Ver condições de voo
+              </a>
+            </div>
+          `)
+          .openOn(map);
+      });
+
       navigator.geolocation?.getCurrentPosition(
         (pos) => {
           if (!mounted) return;
@@ -717,8 +752,19 @@ function ZonasMap() {
       {/* Loading */}
       {(loading || loadingAirports) && (
         <div className="absolute inset-0 z-[999] flex items-center justify-center bg-[#04090f]/80">
-          <div className="text-center">
-            <div className="mx-auto mb-3 h-10 w-10 rounded-full border-[3px] border-white/[0.06] border-t-cyan-400 animate-spin-loader" />
+          <div className="flex flex-col items-center gap-4">
+            <div className="grid h-16 w-16 place-items-center rounded-[20px] border border-cyan-400/20 bg-white/[0.03]">
+              <div className="relative h-[24px] w-[24px]">
+                <span className="absolute left-0 top-0 h-[8px] w-[8px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0s" }} />
+                <span className="absolute right-0 top-0 h-[8px] w-[8px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0.15s" }} />
+                <span className="absolute left-0 bottom-0 h-[8px] w-[8px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0.3s" }} />
+                <span className="absolute right-0 bottom-0 h-[8px] w-[8px] rounded-full border-[2px] border-cyan-400/90 animate-pulse-dot" style={{ animationDelay: "0.45s" }} />
+                <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] bg-cyan-400 animate-pulse-dot" />
+              </div>
+            </div>
+            <div className="h-[3px] w-36 overflow-hidden rounded-full bg-white/[0.06]">
+              <div className="h-full w-full animate-loading-bar rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
+            </div>
             <p className="text-[13px] text-slate-400">
               {loading ? "Carregando mapa..." : "Buscando aeroportos e helipontos..."}
             </p>
