@@ -429,7 +429,7 @@ function HomeContent() {
             )}
             <button onClick={toggleFavorite} disabled={savingFav} className="transition hover:scale-110 disabled:opacity-50"><Star size={16} className={isFavorite ? "fill-amber-400 text-amber-400" : "text-slate-600"} /></button>
           </div>
-          <p className="mt-1 text-[12px] text-slate-500">dados em tempo real</p>
+          <p className="mt-1 text-[12px] text-slate-500">é seguro voar agora?</p>
         </div>
 
         {error && <div className="mb-4 rounded-2xl border border-red-400/15 bg-red-400/[0.06] px-4 py-3 text-[14px] text-red-200">{error}</div>}
@@ -464,7 +464,12 @@ function HomeContent() {
             <div className="absolute inset-[18px] rounded-full animate-radar-spin" style={{ background: `conic-gradient(from 310deg, rgba(255,255,255,0.1), ${LC[level]}12, transparent 20%)`, filter: "blur(3px)" }} />
           </div>
           <div className="relative z-10 flex flex-col items-center">
-            <Radar score={score} level={level} />
+            <button onClick={() => {
+              if (!isLoggedIn) { setLoginFeature("análise detalhada"); setShowLoginModal(true); }
+              else { window.location.href = `/analise?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}`; }
+            }} className="cursor-pointer transition hover:scale-[1.02]">
+              <Radar score={score} level={level} />
+            </button>
             <div className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-1.5" style={{ background: `${LC[level]}10`, border: `1px solid ${LC[level]}20` }}>
               <span className="h-[7px] w-[7px] rounded-full animate-pulse-dot" style={{ background: LC[level] }} />
               <span className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: LC[level] }}>{level === "good" ? "condição ideal" : level === "warn" ? "atenção requerida" : "condição adversa"}</span>
@@ -515,13 +520,20 @@ function HomeContent() {
           <WindCompass direction={windDir} speed={Math.round(wind10m)} gust={Math.round(gust10m)} />
         </section>
 
-        {/* ─── 9. VER ANÁLISE DETALHADA ─── */}
-        <button onClick={() => {
-          if (!isLoggedIn) { setLoginFeature("análise detalhada"); setShowLoginModal(true); }
-          else { window.location.href = `/analise?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}`; }
-        }} className="mb-6 block w-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-4 text-center text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
-          Ver análise detalhada
-        </button>
+        {/* ─── 9. CHECKLIST PRÉ-VOO + VER ANÁLISE DETALHADA ─── */}
+        <div className="mb-6 flex gap-3">
+          <Link href="/checklist"
+            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] py-4 text-[15px] font-medium text-slate-300 transition hover:bg-white/[0.05]">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Checklist
+          </Link>
+          <button onClick={() => {
+            if (!isLoggedIn) { setLoginFeature("análise detalhada"); setShowLoginModal(true); }
+            else { window.location.href = `/analise?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}`; }
+          }} className="flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-4 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
+            Ver análise
+          </button>
+        </div>
 
         {showLoginModal && (<LoginPromptModal feature={loginFeature} onClose={() => setShowLoginModal(false)} />)}
 
