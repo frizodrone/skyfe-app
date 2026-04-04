@@ -581,7 +581,7 @@ function HomeContent() {
           <h1 className="text-[34px] font-bold tracking-tight">Sky<span className="text-cyan-400">Fe</span></h1>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowSearch(true)} className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]"><Search size={19} /></button>
-            <button onClick={() => { window.location.href = "/configuracoes"; }} className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]"><Settings size={19} /></button>
+            <button onClick={() => { if (!isLoggedIn) { setLoginFeature("configurações"); setShowLoginModal(true); } else { window.location.href = "/configuracoes"; } }} className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]"><Settings size={19} /></button>
           </div>
         </header>
 
@@ -689,11 +689,14 @@ function HomeContent() {
 
         {/* ─── 9. CHECKLIST + ANÁLISE + COMPARTILHAR ─── */}
         <div className="mb-3 flex gap-3">
-          <Link href="/checklist"
+          <button onClick={() => {
+            if (!isLoggedIn) { setLoginFeature("checklist"); setShowLoginModal(true); }
+            else { window.location.href = "/checklist"; }
+          }}
             className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] py-4 text-[14px] font-medium text-slate-300 transition hover:bg-white/[0.05]">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             Checklist
-          </Link>
+          </button>
           <button onClick={() => {
             if (!isLoggedIn) { setLoginFeature("análise detalhada"); setShowLoginModal(true); }
             else { window.location.href = `/analise?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}`; }
@@ -703,7 +706,10 @@ function HomeContent() {
         </div>
 
         {/* Share button */}
-        <button onClick={() => generateShareImage(score, level, label, placeName, Math.round(wind10m), Math.round(gust10m), rainP, temp, kpIndex, sunTimes)}
+        <button onClick={() => {
+          if (!isLoggedIn) { setLoginFeature("compartilhar"); setShowLoginModal(true); }
+          else { generateShareImage(score, level, label, placeName, Math.round(wind10m), Math.round(gust10m), rainP, temp, kpIndex, sunTimes); }
+        }}
           className="mb-6 flex w-full items-center justify-center gap-2 rounded-full border border-cyan-400/15 bg-cyan-400/[0.04] py-3.5 text-[14px] font-medium text-cyan-400 transition hover:bg-cyan-400/[0.06]">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           Compartilhar condições
@@ -715,15 +721,23 @@ function HomeContent() {
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">
           <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">
             {[
-              { icon: <Sun size={21} />, label: "Clima", active: true, href: "/" },
-              { icon: <Map size={21} />, label: "Zonas", active: false, href: "/zonas" },
-              { icon: <Clock3 size={21} />, label: "Previsão", active: false, href: `/previsao?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}` },
-              { icon: <User size={21} />, label: "Perfil", active: false, href: "/perfil" },
+              { icon: <Sun size={21} />, label: "Clima", active: true, href: "/", needsLogin: false },
+              { icon: <Map size={21} />, label: "Zonas", active: false, href: "/zonas", needsLogin: true },
+              { icon: <Clock3 size={21} />, label: "Previsão", active: false, href: `/previsao?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}`, needsLogin: true },
+              { icon: <User size={21} />, label: "Perfil", active: false, href: "/perfil", needsLogin: true },
             ].map((tab) => (
-              <Link key={tab.label} href={tab.href} className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
-                <div className={`grid h-8 w-12 place-items-center rounded-xl transition ${tab.active ? "bg-cyan-400/[0.1]" : ""}`}>{tab.icon}</div>
-                <span className={tab.active ? "font-semibold" : ""}>{tab.label}</span>
-              </Link>
+              tab.needsLogin && !isLoggedIn ? (
+                <button key={tab.label} onClick={() => { setLoginFeature(tab.label.toLowerCase()); setShowLoginModal(true); }}
+                  className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
+                  <div className="grid h-8 w-12 place-items-center rounded-xl">{tab.icon}</div>
+                  <span>{tab.label}</span>
+                </button>
+              ) : (
+                <Link key={tab.label} href={tab.href} className={`flex flex-col items-center gap-1 transition ${tab.active ? "text-cyan-400" : "text-slate-500"}`}>
+                  <div className={`grid h-8 w-12 place-items-center rounded-xl transition ${tab.active ? "bg-cyan-400/[0.1]" : ""}`}>{tab.icon}</div>
+                  <span className={tab.active ? "font-semibold" : ""}>{tab.label}</span>
+                </Link>
+              )
             ))}
           </div>
         </nav>

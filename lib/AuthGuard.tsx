@@ -163,10 +163,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // PASSO 3: Todas as outras páginas exigem login
+      // PASSO 3: Todas as outras páginas exigem login — volta para home
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        window.location.href = "/login";
+        window.location.href = "/";
         return;
       }
 
