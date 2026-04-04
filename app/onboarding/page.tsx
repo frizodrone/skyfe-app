@@ -14,7 +14,7 @@ import {
 const ONBOARDING_KEY = "skyfe-onboarding-done";
 
 export function isOnboardingDone(): boolean {
-  if (typeof window === "undefined") return true;
+  if (typeof window === "undefined") return false;
   try { return localStorage.getItem(ONBOARDING_KEY) === "true"; } catch { return false; }
 }
 
@@ -53,11 +53,27 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
         </div>
         <h1 className="mb-3 text-[36px] font-bold tracking-tight">Sky<span className="text-cyan-400">Fe</span></h1>
         <p className="mb-2 text-[18px] font-semibold text-white">É seguro voar agora?</p>
-        <p className="mb-10 max-w-[280px] text-center text-[14px] leading-relaxed text-slate-400">
+        <p className="mb-8 max-w-[280px] text-center text-[14px] leading-relaxed text-slate-400">
           Seu copiloto inteligente para decisões de voo. Vamos configurar em menos de 1 minuto.
         </p>
+
+        {/* Privacy card */}
+        <div className="mb-8 w-full max-w-[320px] rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-4">
+          <div className="mb-3 flex items-center gap-2.5">
+            <Shield size={18} className="text-emerald-400 shrink-0" />
+            <span className="text-[13px] font-semibold text-white">Sua privacidade é prioridade</span>
+          </div>
+          <p className="text-[12px] leading-relaxed text-slate-400 mb-3">
+            Não vendemos nem compartilhamos seus dados pessoais. Usamos apenas o necessário para melhorar sua experiência de voo.
+          </p>
+          <div className="flex gap-3 text-[11px]">
+            <a href="/privacidade" target="_blank" className="text-cyan-400 underline underline-offset-2">Política de privacidade</a>
+            <a href="/termos" target="_blank" className="text-cyan-400 underline underline-offset-2">Termos de uso</a>
+          </div>
+        </div>
+
         <button onClick={onNext} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-8 py-4 text-[16px] font-semibold text-slate-950 shadow-[0_0_30px_rgba(45,204,255,0.2)] transition hover:brightness-105">
-          Começar <ChevronRight size={20} />
+          Aceitar e começar <ChevronRight size={20} />
         </button>
       </div>
       <div className="fixed bottom-8 flex gap-2">

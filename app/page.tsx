@@ -747,5 +747,27 @@ function HomeContent() {
 }
 
 export default function Home() {
-  return <AuthGuard><HomeContent /></AuthGuard>;
+  const [checkDone, setCheckDone] = useState(false);
+
+  useEffect(() => {
+    let done = false;
+    try { done = localStorage.getItem("skyfe-onboarding-done") === "true"; } catch {}
+    if (!done) {
+      window.location.replace("/onboarding");
+    } else {
+      setCheckDone(true);
+    }
+  }, []);
+
+  if (!checkDone) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
+        <div className="h-[3px] w-48 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="h-full w-full animate-loading-bar rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
+        </div>
+      </main>
+    );
+  }
+
+  return <HomeContent />;
 }
