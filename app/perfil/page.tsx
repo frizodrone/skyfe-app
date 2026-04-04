@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft, Sun, Map, Clock3, User, Shield, Globe, Info,
-  Edit3, Save, ChevronDown, Star, X, Plane, Camera, MapPinned, Zap,
-  Tractor, Navigation2, Plus, Check, Share2, Download,
+  Edit3, Save, ChevronDown, X, Plane, Camera, MapPinned, Zap,
+  Tractor, Navigation2, Plus, Check,
 } from "lucide-react";
 import Link from "next/link";
 import AuthGuard, { useIsLoggedIn, LoginPromptModal } from "@/lib/AuthGuard";
@@ -13,22 +13,21 @@ import { DRONE_DATABASE, searchDrones, getDroneById, type DroneModel } from "@/l
 
 type Profile = {
   name: string;
-  pilotType: string;
+  pilotTypes: string[];
   experience: string;
-  anac: string;
   drone: string;
   drones: string[];
 };
 
-const DEFAULTS: Profile = { name: "", pilotType: "", experience: "", anac: "", drone: "", drones: [] };
+const DEFAULTS: Profile = { name: "", pilotTypes: [], experience: "", drone: "", drones: [] };
 
 const PILOT_TYPES: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  hobbyist: { label: "Hobbyista", icon: <Plane size={14} />, color: "#22d3ee" },
-  photographer: { label: "Fotógrafo / Cinegrafista", icon: <Camera size={14} />, color: "#a78bfa" },
-  mapper: { label: "Mapeamento / Inspeção", icon: <MapPinned size={14} />, color: "#2dffb3" },
-  fpv: { label: "FPV / Racing", icon: <Zap size={14} />, color: "#ff5a5f" },
+  recreational: { label: "Recreativo", icon: <Plane size={14} />, color: "#22d3ee" },
+  photo_video: { label: "Foto e Vídeo", icon: <Camera size={14} />, color: "#a78bfa" },
+  fpv: { label: "FPV / Freestyle", icon: <Zap size={14} />, color: "#ff5a5f" },
+  mapping: { label: "Mapeamento", icon: <MapPinned size={14} />, color: "#2dffb3" },
   agricultural: { label: "Agrícola", icon: <Tractor size={14} />, color: "#ffd84d" },
-  other: { label: "Outro", icon: <Navigation2 size={14} />, color: "#94a3b8" },
+  commercial: { label: "Comercial", icon: <Navigation2 size={14} />, color: "#94a3b8" },
 };
 
 const EXP_OPTIONS: Record<string, { label: string; color: string }> = {
@@ -68,7 +67,7 @@ function Perfil() {
         const pilot = localStorage.getItem("skyfe-pilot");
         if (pilot) {
           const p = JSON.parse(pilot);
-          setProfile(prev => ({ ...prev, name: p.name || prev.name, pilotType: p.pilotType || prev.pilotType, experience: p.experience || prev.experience }));
+          setProfile(prev => ({ ...prev, name: p.name || prev.name, pilotTypes: p.pilotTypes || (p.pilotType ? [p.pilotType] : prev.pilotTypes), experience: p.experience || prev.experience }));
         }
         const dronesRaw = localStorage.getItem("skyfe-user-drones");
         const activeDrone = localStorage.getItem("skyfe-active-drone");
@@ -98,7 +97,7 @@ function Perfil() {
 
   const handleSave = async () => {
     try {
-      localStorage.setItem("skyfe-pilot", JSON.stringify({ name: profile.name, pilotType: profile.pilotType, experience: profile.experience, anac: profile.anac }));
+      localStorage.setItem("skyfe-pilot", JSON.stringify({ name: profile.name, pilotTypes: profile.pilotTypes, experience: profile.experience }));
       localStorage.setItem("skyfe-user-drones", JSON.stringify(profile.drones));
       localStorage.setItem("skyfe-active-drone", profile.drone);
     } catch {}
@@ -129,7 +128,6 @@ function Perfil() {
     setProfile(prev => ({ ...prev, drone: name }));
   };
 
-  const pilotInfo = PILOT_TYPES[profile.pilotType];
   const expInfo = EXP_OPTIONS[profile.experience];
   const initials = getInitials(profile.name);
 
@@ -172,12 +170,16 @@ function Perfil() {
 
             {/* Badges */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-              {pilotInfo && (
-                <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5" style={{ background: `${pilotInfo.color}0d`, border: `1px solid ${pilotInfo.color}22` }}>
-                  <span style={{ color: pilotInfo.color }}>{pilotInfo.icon}</span>
-                  <span className="text-[11px] font-semibold" style={{ color: pilotInfo.color }}>{pilotInfo.label}</span>
-                </div>
-              )}
+              {profile.pilotTypes.map(pt => {
+                const info = PILOT_TYPES[pt];
+                if (!info) return null;
+                return (
+                  <div key={pt} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5" style={{ background: `${info.color}0d`, border: `1px solid ${info.color}22` }}>
+                    <span style={{ color: info.color }}>{info.icon}</span>
+                    <span className="text-[11px] font-semibold" style={{ color: info.color }}>{info.label}</span>
+                  </div>
+                );
+              })}
               {expInfo && (
                 <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5" style={{ background: `${expInfo.color}0d`, border: `1px solid ${expInfo.color}22` }}>
                   <span className="h-2 w-2 rounded-full" style={{ background: expInfo.color }} />
@@ -185,28 +187,29 @@ function Perfil() {
                 </div>
               )}
             </div>
-
-            {profile.anac && <p className="mt-2 text-[11px] text-slate-500">ANAC: {profile.anac}</p>}
           </div>
         </section>
 
-        {/* ─── Edit fields (pilot type + exp + anac) ─── */}
+        {/* ─── Edit fields (pilot types + exp) ─── */}
         {editing && (
           <section className="mb-6 rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-5">
             <div className="mb-4">
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Tipo de piloto</label>
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">O que você faz com drone? <span className="text-slate-600">(selecione quantos quiser)</span></label>
               <div className="grid grid-cols-2 gap-2">
-                {Object.entries(PILOT_TYPES).map(([k, v]) => (
-                  <button key={k} onClick={() => setProfile(p => ({ ...p, pilotType: k }))}
-                    className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-left transition"
-                    style={profile.pilotType === k ? { background: `${v.color}0d`, border: `1px solid ${v.color}25` } : { background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)" }}>
-                    <span style={{ color: profile.pilotType === k ? v.color : "#64748b" }}>{v.icon}</span>
-                    <span className="text-[11px] font-medium" style={{ color: profile.pilotType === k ? "#fff" : "#94a3b8" }}>{v.label}</span>
-                  </button>
-                ))}
+                {Object.entries(PILOT_TYPES).map(([k, v]) => {
+                  const sel = profile.pilotTypes.includes(k);
+                  return (
+                    <button key={k} onClick={() => setProfile(p => ({ ...p, pilotTypes: sel ? p.pilotTypes.filter(t => t !== k) : [...p.pilotTypes, k] }))}
+                      className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-left transition"
+                      style={sel ? { background: `${v.color}0d`, border: `1px solid ${v.color}25` } : { background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                      <span style={{ color: sel ? v.color : "#64748b" }}>{v.icon}</span>
+                      <span className="text-[11px] font-medium" style={{ color: sel ? "#fff" : "#94a3b8" }}>{v.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <div className="mb-4">
+            <div>
               <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Experiência</label>
               <div className="flex flex-col gap-1">
                 {Object.entries(EXP_OPTIONS).map(([k, v]) => (
@@ -218,11 +221,6 @@ function Perfil() {
                   </button>
                 ))}
               </div>
-            </div>
-            <div>
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Registro ANAC (opcional)</label>
-              <input value={profile.anac} onChange={e => setProfile(p => ({ ...p, anac: e.target.value }))} placeholder="Ex: PP-XYZ"
-                className="w-full rounded-[10px] border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-[13px] text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/20" />
             </div>
           </section>
         )}
@@ -310,8 +308,8 @@ function Perfil() {
           {showAbout && (
             <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.02] p-5">
               <div className="mb-4 flex items-center gap-3">
-                <div className="grid h-12 w-12 place-items-center rounded-[14px] border border-cyan-400/20 bg-white/[0.03]">
-                  <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] bg-cyan-400" />
+                <div className="relative grid h-12 w-12 place-items-center rounded-[14px] border border-cyan-400/20 bg-white/[0.03]">
+                  <div className="h-2.5 w-2.5 rounded-[3px] bg-cyan-400" />
                 </div>
                 <div><h2 className="text-[18px] font-bold">Sky<span className="text-cyan-400">Fe</span></h2><p className="text-[12px] text-slate-500">Versão 2.5.3</p></div>
               </div>

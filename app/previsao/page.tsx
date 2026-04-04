@@ -29,6 +29,7 @@ export default function PrevisaoPage() {
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [kpIndex, setKpIndex] = useState(0);
   const [kpForecast, setKpForecast] = useState<KpForecastItem[]>([]);
+  const [popupItem, setPopupItem] = useState<HourItem | null>(null);
 
   useEffect(() => {
     if (shared.loading || !shared.location) return;
@@ -214,7 +215,7 @@ export default function PrevisaoPage() {
         {activeTab === "hours" && (
           <div className="flex flex-col gap-3">
             {hourlyItems.map((h) => (
-              <div key={h.time} className="relative flex items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4" style={{ background: `linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)`, border: `1px solid ${LC[h.level]}18` }}>
+              <button key={h.time} onClick={() => setPopupItem(h)} className="relative flex w-full items-center gap-4 overflow-hidden rounded-[18px] px-5 py-4 text-left transition hover:bg-white/[0.02]" style={{ background: `linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)`, border: `1px solid ${LC[h.level]}18` }}>
                 <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full" style={{ background: LC[h.level], opacity: 0.6 }} />
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl" style={{ background: `${LC[h.level]}10`, border: `1px solid ${LC[h.level]}20` }}>
                   <span className="text-[16px] font-bold" style={{ color: LC[h.level] }}>{h.score}</span>
@@ -233,7 +234,7 @@ export default function PrevisaoPage() {
                   </div>
                 </div>
                 <span className="h-[12px] w-[12px] shrink-0 rounded-full" style={{ background: LC[h.level], boxShadow: `0 0 10px ${LC[h.level]}44` }} />
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -283,6 +284,60 @@ export default function PrevisaoPage() {
           </div>
         )}
       </div>
+
+      {/* ─── Popup detail modal ─── */}
+      {popupItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-5" onClick={(e) => { if (e.target === e.currentTarget) setPopupItem(null); }}>
+          <div className="relative w-full max-w-sm overflow-hidden rounded-[24px] border border-white/[0.1] bg-[#0a1222] p-6 shadow-[0_0_60px_rgba(0,0,0,0.5)]">
+            <button onClick={() => setPopupItem(null)} className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/[0.06] text-slate-400 hover:text-white"><X size={16} /></button>
+
+            {/* Mini radar */}
+            <div className="flex flex-col items-center mb-5">
+              <p className="text-[13px] text-slate-500 mb-3">
+                {new Date(popupItem.time).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "short" })} às {popupItem.hour}
+              </p>
+              <div className="relative h-[120px] w-[120px] mb-3">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                  <circle cx="60" cy="60" r="50" fill="none" stroke={LC[popupItem.level]} strokeWidth="6"
+                    strokeDasharray={`${2 * Math.PI * 50}`} strokeDashoffset={`${2 * Math.PI * 50 * (1 - popupItem.score / 100)}`}
+                    strokeLinecap="round" transform="rotate(-90 60 60)" style={{ filter: `drop-shadow(0 0 8px ${LC[popupItem.level]}44)` }} />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-[32px] font-bold" style={{ color: LC[popupItem.level] }}>{popupItem.score}</span>
+                  <span className="text-[10px] text-slate-500">/100</span>
+                </div>
+              </div>
+              <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1" style={{ background: `${LC[popupItem.level]}10`, border: `1px solid ${LC[popupItem.level]}20` }}>
+                <span className="h-[6px] w-[6px] rounded-full" style={{ background: LC[popupItem.level] }} />
+                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: LC[popupItem.level] }}>
+                  {popupItem.level === "good" ? "Bom para voar" : popupItem.level === "warn" ? "Atenção requerida" : "Não recomendado"}
+                </span>
+              </div>
+            </div>
+
+            {/* Metrics grid */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[
+                { icon: <Wind size={14} />, label: "Vento", value: `${popupItem.wind}`, unit: "km/h" },
+                { icon: <Zap size={14} />, label: "Rajada", value: `${popupItem.gust}`, unit: "km/h" },
+                { icon: <CloudRain size={14} />, label: "Chuva", value: `${popupItem.rainP}`, unit: "%" },
+                { icon: <Thermometer size={14} />, label: "Temp", value: `${popupItem.temp}`, unit: "°C" },
+                { icon: <Activity size={14} />, label: "Kp", value: `${popupItem.kp.toFixed(1)}`, unit: "" },
+                { icon: <Eye size={14} />, label: "Visib.", value: popupItem.visibility ? getVisibilityKm(popupItem.visibility) : "—", unit: "" },
+              ].map(m => (
+                <div key={m.label} className="flex flex-col items-center gap-1 rounded-[12px] border border-white/[0.05] bg-white/[0.02] py-2.5">
+                  <span className="text-slate-500">{m.icon}</span>
+                  <span className="text-[16px] font-bold text-white">{m.value}<span className="text-[10px] text-slate-500 ml-0.5">{m.unit}</span></span>
+                  <span className="text-[9px] text-slate-600">{m.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-[11px] text-slate-600">Toque fora para fechar</p>
+          </div>
+        </div>
+      )}
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">
         <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">

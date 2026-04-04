@@ -589,27 +589,45 @@ function ZonasMap() {
 
       // Clique no mapa → popup com condições meteorológicas
       // Usar evento global para comunicar com React
-      (window as any).__skyfeMapClick = (lat: number, lng: number) => {
-        shared.setSearchLocation(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      (window as any).__skyfeMapClick = (lat: number, lng: number, name?: string) => {
+        shared.setSearchLocation(lat, lng, name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
         window.location.href = "/";
       };
 
-      map.on("click", (e: any) => {
+      map.on("click", async (e: any) => {
         const { lat, lng } = e.latlng;
+        // Show popup with loading, then fetch address
         const popup = L.popup()
           .setLatLng(e.latlng)
-          .setContent(`
+          .setContent(`<div style="text-align:center;font-family:-apple-system,sans-serif;min-width:200px;"><p style="font-size:12px;color:#94a3b8;margin:0;">Buscando endereço...</p><p style="font-size:11px;color:#475569;margin:4px 0 0;">${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`)
+          .openOn(map);
+
+        // Reverse geocode
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`);
+          const data = await res.json();
+          const addr = data.display_name?.split(",").slice(0, 3).join(",").trim() || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          popup.setContent(`
+            <div style="text-align:center;font-family:-apple-system,sans-serif;min-width:200px;">
+              <p style="font-size:13px;color:#e2e8f0;font-weight:600;margin:0 0 4px;">${addr}</p>
+              <p style="font-size:10px;color:#475569;margin:0 0 10px;">${lat.toFixed(5)}, ${lng.toFixed(5)}</p>
+              <button onclick="window.__skyfeMapClick(${lat}, ${lng}, '${addr.replace(/'/g, "\\'")}')"
+                 style="display:inline-block;padding:8px 16px;border-radius:99px;background:linear-gradient(135deg,#22d3ee,#34d399);color:#04090f;font-size:13px;font-weight:600;border:none;cursor:pointer;">
+                Ver condições de voo
+              </button>
+            </div>
+          `);
+        } catch {
+          popup.setContent(`
             <div style="text-align:center;font-family:-apple-system,sans-serif;min-width:180px;">
-              <p style="font-size:12px;color:#64748b;margin:0 0 8px;">
-                ${lat.toFixed(4)}, ${lng.toFixed(4)}
-              </p>
+              <p style="font-size:12px;color:#64748b;margin:0 0 8px;">${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
               <button onclick="window.__skyfeMapClick(${lat}, ${lng})"
                  style="display:inline-block;padding:8px 16px;border-radius:99px;background:linear-gradient(135deg,#22d3ee,#34d399);color:#04090f;font-size:13px;font-weight:600;border:none;cursor:pointer;">
                 Ver condições de voo
               </button>
             </div>
-          `)
-          .openOn(map);
+          `);
+        }
       });
 
       // Inicializar posição a partir da localização compartilhada
@@ -793,19 +811,20 @@ function ZonasMap() {
       }
     }
 
-    // User position
+    // User position — pin grande e visível
     const userIcon = L.divIcon({
-      html: `<div style="position:relative;width:20px;height:20px;">
-        <div style="position:absolute;inset:0;border-radius:50%;background:rgba(45,204,255,0.2);animation:pulse 2s ease-in-out infinite;"></div>
-        <div style="position:absolute;inset:4px;border-radius:50%;background:#2dccff;border:3px solid #fff;box-shadow:0 0 16px rgba(45,204,255,0.6);"></div>
+      html: `<div style="position:relative;width:36px;height:36px;">
+        <div style="position:absolute;inset:0;border-radius:50%;background:rgba(45,204,255,0.25);animation:pulse 2s ease-in-out infinite;"></div>
+        <div style="position:absolute;inset:-6px;border-radius:50%;background:rgba(45,204,255,0.08);animation:pulse 2s ease-in-out infinite 0.5s;"></div>
+        <div style="position:absolute;inset:6px;border-radius:50%;background:#2dccff;border:3px solid #fff;box-shadow:0 0 20px rgba(45,204,255,0.7);"></div>
       </div>`,
       className: "",
-      iconSize: [20, 20],
-      iconAnchor: [10, 10],
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
     });
 
     const userMarker = L.marker(userPos, { icon: userIcon, zIndexOffset: 1000 });
-    userMarker.bindTooltip("Sua localização", { direction: "top", offset: [0, -12] });
+    userMarker.bindTooltip("Sua localização", { direction: "top", offset: [0, -20] });
     layerGroupRef.current.addLayer(userMarker);
 
     // Range circle (5km)

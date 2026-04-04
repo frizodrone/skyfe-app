@@ -24,12 +24,12 @@ export function markOnboardingDone(): void {
 
 /* ═══ PILOT TYPES ═══ */
 const PILOT_TYPES = [
-  { value: "hobbyist", label: "Hobbyista", icon: <Plane size={20} />, desc: "Voo recreativo e diversão" },
-  { value: "photographer", label: "Fotógrafo / Cinegrafista", icon: <Camera size={20} />, desc: "Fotos e vídeos aéreos" },
-  { value: "mapper", label: "Mapeamento / Inspeção", icon: <MapPinned size={20} />, desc: "Topografia, inspeção técnica" },
-  { value: "fpv", label: "FPV / Racing", icon: <Zap size={20} />, desc: "Freestyle, racing, cinewhoop" },
+  { value: "recreational", label: "Recreativo", icon: <Plane size={20} />, desc: "Voo por diversão e lazer" },
+  { value: "photo_video", label: "Foto e Vídeo", icon: <Camera size={20} />, desc: "Fotografia e filmagem aérea" },
+  { value: "fpv", label: "FPV / Freestyle", icon: <Zap size={20} />, desc: "Racing, freestyle, cinewhoop" },
+  { value: "mapping", label: "Mapeamento", icon: <MapPinned size={20} />, desc: "Topografia, inspeção técnica" },
   { value: "agricultural", label: "Agrícola", icon: <Tractor size={20} />, desc: "Pulverização e monitoramento" },
-  { value: "other", label: "Outro", icon: <Navigation2 size={20} />, desc: "Delivery, pesquisa, outros" },
+  { value: "commercial", label: "Comercial", icon: <Navigation2 size={20} />, desc: "Delivery, eventos, outros" },
 ];
 
 const EXP_OPTIONS = [
@@ -68,11 +68,15 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
 }
 
 /* ═══ STEP 2 — Pilot Info ═══ */
-function StepPilotInfo({ onNext }: { onNext: (data: { name: string; pilotType: string; experience: string }) => void }) {
+function StepPilotInfo({ onNext }: { onNext: (data: { name: string; pilotTypes: string[]; experience: string }) => void }) {
   const [name, setName] = useState("");
-  const [pilotType, setPilotType] = useState("");
+  const [pilotTypes, setPilotTypes] = useState<string[]>([]);
   const [experience, setExperience] = useState("");
-  const canProceed = name.trim().length >= 2 && pilotType && experience;
+  const canProceed = name.trim().length >= 2 && pilotTypes.length > 0 && experience;
+
+  const toggleType = (val: string) => {
+    setPilotTypes(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+  };
 
   return (
     <div className="flex min-h-screen flex-col px-6 py-10">
@@ -81,29 +85,29 @@ function StepPilotInfo({ onNext }: { onNext: (data: { name: string; pilotType: s
         <h2 className="mb-2 text-[24px] font-bold">Sobre você</h2>
         <p className="mb-6 text-[14px] text-slate-400">Nos ajuda a personalizar a experiência.</p>
 
-        {/* Name */}
         <div className="mb-6">
           <label className="mb-2 block text-[12px] font-semibold uppercase tracking-wider text-slate-500">Seu nome</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Como quer ser chamado?"
             className="w-full rounded-[14px] border border-white/[0.08] bg-white/[0.03] px-4 py-3.5 text-[15px] text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/30" />
         </div>
 
-        {/* Pilot type */}
         <div className="mb-6">
-          <label className="mb-2 block text-[12px] font-semibold uppercase tracking-wider text-slate-500">Tipo de piloto</label>
+          <label className="mb-2 block text-[12px] font-semibold uppercase tracking-wider text-slate-500">O que você faz com drone? <span className="text-slate-600">(selecione quantos quiser)</span></label>
           <div className="grid grid-cols-2 gap-2">
-            {PILOT_TYPES.map(t => (
-              <button key={t.value} onClick={() => setPilotType(t.value)}
-                className="flex items-center gap-2.5 rounded-[14px] px-3 py-3 text-left transition"
-                style={pilotType === t.value ? { background: "rgba(45,204,255,0.08)", border: "1px solid rgba(45,204,255,0.25)", color: "#22d3ee" } : { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", color: "#94a3b8" }}>
-                <div className="shrink-0">{t.icon}</div>
-                <div><p className="text-[12px] font-semibold" style={{ color: pilotType === t.value ? "#fff" : "#cbd5e1" }}>{t.label}</p><p className="text-[10px]" style={{ color: pilotType === t.value ? "#94a3b8" : "#475569" }}>{t.desc}</p></div>
-              </button>
-            ))}
+            {PILOT_TYPES.map(t => {
+              const sel = pilotTypes.includes(t.value);
+              return (
+                <button key={t.value} onClick={() => toggleType(t.value)}
+                  className="flex items-center gap-2.5 rounded-[14px] px-3 py-3 text-left transition"
+                  style={sel ? { background: "rgba(45,204,255,0.08)", border: "1px solid rgba(45,204,255,0.25)", color: "#22d3ee" } : { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", color: "#94a3b8" }}>
+                  <div className="shrink-0">{t.icon}</div>
+                  <div><p className="text-[12px] font-semibold" style={{ color: sel ? "#fff" : "#cbd5e1" }}>{t.label}</p><p className="text-[10px]" style={{ color: sel ? "#94a3b8" : "#475569" }}>{t.desc}</p></div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Experience */}
         <div className="mb-6">
           <label className="mb-2 block text-[12px] font-semibold uppercase tracking-wider text-slate-500">Experiência</label>
           <div className="flex flex-col gap-1.5">
@@ -119,7 +123,7 @@ function StepPilotInfo({ onNext }: { onNext: (data: { name: string; pilotType: s
         </div>
       </div>
 
-      <button disabled={!canProceed} onClick={() => canProceed && onNext({ name, pilotType, experience })}
+      <button disabled={!canProceed} onClick={() => canProceed && onNext({ name, pilotTypes, experience })}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-full py-4 text-[16px] font-semibold transition disabled:opacity-30"
         style={canProceed ? { background: "linear-gradient(135deg, #22d3ee, #34d399)", color: "#04090f", boxShadow: "0 0 30px rgba(45,204,255,0.2)" } : { background: "rgba(255,255,255,0.06)", color: "#64748b" }}>
         Próximo <ChevronRight size={20} />
@@ -236,12 +240,12 @@ function StepConfirm({ name, drone, onFinish }: { name: string; drone: DroneMode
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [pilotInfo, setPilotInfo] = useState<{ name: string; pilotType: string; experience: string } | null>(null);
+  const [pilotInfo, setPilotInfo] = useState<{ name: string; pilotTypes: string[]; experience: string } | null>(null);
   const [selectedDrone, setSelectedDrone] = useState<DroneModel | null>(null);
 
   useEffect(() => { if (isOnboardingDone()) router.replace("/"); }, [router]);
 
-  const handlePilotInfo = (data: { name: string; pilotType: string; experience: string }) => {
+  const handlePilotInfo = (data: { name: string; pilotTypes: string[]; experience: string }) => {
     setPilotInfo(data);
     try {
       localStorage.setItem("skyfe-pilot", JSON.stringify(data));
