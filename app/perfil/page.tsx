@@ -1,90 +1,49 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
-  ArrowLeft, Sun, Map, Clock3, User, Settings, Shield, Globe, Info,
-  Edit3, Save, ChevronDown, Star, Trash2, MapPin, X,
+  ArrowLeft, Sun, Map, Clock3, User, Shield, Globe, Info,
+  Edit3, Save, ChevronDown, Star, X, Plane, Camera, MapPinned, Zap,
+  Tractor, Navigation2, Plus, Check, Share2, Download,
 } from "lucide-react";
 import Link from "next/link";
 import AuthGuard, { useIsLoggedIn, LoginPromptModal } from "@/lib/AuthGuard";
 import { supabase } from "@/lib/supabase";
+import { DRONE_DATABASE, searchDrones, getDroneById, type DroneModel } from "@/lib/drones";
 
-import { DRONE_DATABASE } from "@/lib/drones";
+type Profile = {
+  name: string;
+  pilotType: string;
+  experience: string;
+  anac: string;
+  drone: string;
+  drones: string[];
+};
 
-type Profile = { name: string; drone: string; drones: string[]; experience: string };
+const DEFAULTS: Profile = { name: "", pilotType: "", experience: "", anac: "", drone: "", drones: [] };
 
-// Generate DRONE_CATEGORIES dynamically from the database
-const DRONE_CATEGORIES = (() => {
-  const groups: Record<string, string[]> = {};
-  const brandOrder = ["DJI", "Autel", "Skydio", "Parrot", "FIMI", "Hubsan", "Potensic", "Antigravity", "ZeroZero", "Ryze", "FPV Genérico"];
+const PILOT_TYPES: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  hobbyist: { label: "Hobbyista", icon: <Plane size={14} />, color: "#22d3ee" },
+  photographer: { label: "Fotógrafo / Cinegrafista", icon: <Camera size={14} />, color: "#a78bfa" },
+  mapper: { label: "Mapeamento / Inspeção", icon: <MapPinned size={14} />, color: "#2dffb3" },
+  fpv: { label: "FPV / Racing", icon: <Zap size={14} />, color: "#ff5a5f" },
+  agricultural: { label: "Agrícola", icon: <Tractor size={14} />, color: "#ffd84d" },
+  other: { label: "Outro", icon: <Navigation2 size={14} />, color: "#94a3b8" },
+};
 
-  for (const drone of DRONE_DATABASE) {
-    // Group DJI by sub-category
-    let cat = drone.brand;
-    if (drone.brand === "DJI") {
-      if (drone.name.includes("Mini") || drone.name === "Flip" || drone.name.includes("Neo")) cat = "DJI Mini / Neo / Flip";
-      else if (drone.name.includes("Air")) cat = "DJI Air";
-      else if (drone.name.includes("Mavic")) cat = "DJI Mavic";
-      else if (drone.name.includes("Avata") || drone.name === "FPV") cat = "DJI FPV / Avata";
-      else if (drone.name.includes("Phantom") || drone.name === "Spark") cat = "DJI Clássicos";
-      else if (drone.name.includes("Inspire")) cat = "DJI Inspire";
-      else if (drone.name.includes("Matrice") || drone.name.includes("FlyCart")) cat = "DJI Enterprise";
-      else if (drone.name.includes("Agras")) cat = "DJI Agrícola";
-      else if (drone.name.includes("Enterprise") || drone.name.includes("Thermal") || drone.name.includes("Multispectral")) cat = "DJI Enterprise";
-      else cat = "DJI Outros";
-    }
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(`${drone.brand} ${drone.name}`);
-  }
-
-  return Object.entries(groups).map(([category, items]) => ({ category, items }));
-})();
-
-const EXP_OPTIONS = [
-  { value: "beginner", label: "Iniciante", color: "#94a3b8" },
-  { value: "intermediate", label: "Intermediário", color: "#ffd84d" },
-  { value: "advanced", label: "Avançado", color: "#2dccff" },
-  { value: "pro", label: "Profissional", color: "#2dffb3" },
-  { value: "expert", label: "Especialista", color: "#c084fc" },
-];
-
-const DEFAULTS: Profile = { name: "", drone: "", drones: [], experience: "" };
+const EXP_OPTIONS: Record<string, { label: string; color: string }> = {
+  beginner: { label: "Iniciante", color: "#94a3b8" },
+  intermediate: { label: "Intermediário", color: "#ffd84d" },
+  advanced: { label: "Avançado", color: "#22d3ee" },
+  pro: { label: "Profissional", color: "#2dffb3" },
+  expert: { label: "Especialista", color: "#a78bfa" },
+};
 
 function getInitials(name: string): string {
   const p = name.trim().split(/\s+/).filter(Boolean);
   if (p.length >= 2) return (p[0][0] + p[p.length - 1][0]).toUpperCase();
   if (p.length === 1) return p[0][0].toUpperCase();
-  return "";
-}
-
-/* ─── Dropdown ─── */
-function Dropdown({ label, value, placeholder, children, open, onToggle }: {
-  label: string; value: string; placeholder: string;
-  children: React.ReactNode; open: boolean; onToggle: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node) && open) onToggle(); }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open, onToggle]);
-
-  return (
-    <div ref={ref} className="relative">
-      <label className="mb-2 block text-[13px] font-medium uppercase tracking-wider text-slate-500">{label}</label>
-      <button onClick={onToggle}
-        className="flex w-full items-center justify-between rounded-2xl border bg-white/[0.03] px-5 py-4 text-left transition-all"
-        style={{ borderColor: open ? "rgba(45,204,255,0.3)" : "rgba(255,255,255,0.08)" }}>
-        <span className={value ? "text-[15px] font-medium text-white" : "text-[15px] text-slate-500"}>{value || placeholder}</span>
-        <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[300px] overflow-y-auto rounded-2xl border border-white/[0.1] bg-[#0b1424] shadow-[0_12px_40px_rgba(0,0,0,0.6)] no-scrollbar">
-          {children}
-        </div>
-      )}
-    </div>
-  );
+  return "P";
 }
 
 export default function PerfilWrapper() {
@@ -96,434 +55,294 @@ function Perfil() {
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
-  const [favorites, setFavorites] = useState<any[]>([]);
-  const [droneOpen, setDroneOpen] = useState(false);
-  const [expOpen, setExpOpen] = useState(false);
+  const [showDroneAdd, setShowDroneAdd] = useState(false);
+  const [droneQuery, setDroneQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const isLoggedIn = useIsLoggedIn();
 
   useEffect(() => {
-    const loadFromDB = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        // Não logado — carregar dados do localStorage (onboarding)
-        try {
-          const droneRaw = localStorage.getItem("skyfe-drone");
-          const dronesRaw = localStorage.getItem("skyfe-user-drones");
-          const activeDrone = localStorage.getItem("skyfe-active-drone");
-          if (droneRaw) {
-            const drone = JSON.parse(droneRaw);
-            const drones = dronesRaw ? JSON.parse(dronesRaw) : [];
-            const droneName = `${drone.brand} ${drone.name}`;
-            if (!drones.includes(droneName)) drones.unshift(droneName);
-            setProfile(prev => ({
-              ...prev,
-              drone: activeDrone || droneName,
-              drones: drones.length > 0 ? drones : [droneName],
-            }));
-          }
-        } catch {}
-        setLoading(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from("profiles")
-        .select("name, drone_model, experience_level")
-        .eq("id", user.id)
-        .single();
-
-      if (data) {
-        // Load drones list from localStorage (not in Supabase)
-        let savedDrones: string[] = [];
-        try {
-          const raw = localStorage.getItem("skyfe-user-drones");
-          if (raw) savedDrones = JSON.parse(raw);
-        } catch {}
-
-        const activeDrone = data.drone_model || "";
-        // Ensure active drone is in the list
-        if (activeDrone && !savedDrones.includes(activeDrone)) {
-          savedDrones = [activeDrone, ...savedDrones];
+    const loadData = async () => {
+      // Load from localStorage first (works without login)
+      try {
+        const pilot = localStorage.getItem("skyfe-pilot");
+        if (pilot) {
+          const p = JSON.parse(pilot);
+          setProfile(prev => ({ ...prev, name: p.name || prev.name, pilotType: p.pilotType || prev.pilotType, experience: p.experience || prev.experience }));
         }
+        const dronesRaw = localStorage.getItem("skyfe-user-drones");
+        const activeDrone = localStorage.getItem("skyfe-active-drone");
+        if (dronesRaw) {
+          const drones = JSON.parse(dronesRaw);
+          setProfile(prev => ({ ...prev, drones, drone: activeDrone || drones[0] || "" }));
+        }
+      } catch {}
 
-        const p: Profile = {
-          name: data.name || "",
-          drone: activeDrone,
-          drones: savedDrones,
-          experience: data.experience_level || "",
-        };
-        setProfile(p);
-        if (!p.name && !p.drone) setEditing(true);
-      } else {
-        setEditing(true);
+      // Sync from Supabase if logged in
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from("profiles").select("name, drone_model, experience_level").eq("id", user.id).single();
+        if (data) {
+          setProfile(prev => ({
+            ...prev,
+            name: data.name || prev.name,
+            drone: data.drone_model || prev.drone,
+            experience: data.experience_level || prev.experience,
+          }));
+        }
       }
-
-      // Load favorites
-      const { data: favs } = await supabase
-        .from("favorites")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      if (favs) setFavorites(favs);
-
       setLoading(false);
     };
-    loadFromDB();
+    loadData();
   }, []);
 
-  const update = (key: keyof Profile, value: string) => setProfile((prev) => ({ ...prev, [key]: value }));
-
   const handleSave = async () => {
-    // Save drones list to localStorage (works without login)
     try {
+      localStorage.setItem("skyfe-pilot", JSON.stringify({ name: profile.name, pilotType: profile.pilotType, experience: profile.experience, anac: profile.anac }));
       localStorage.setItem("skyfe-user-drones", JSON.stringify(profile.drones));
       localStorage.setItem("skyfe-active-drone", profile.drone);
     } catch {}
-
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await supabase
-        .from("profiles")
-        .update({
-          name: profile.name,
-          drone_model: profile.drone,
-          experience_level: profile.experience,
-        })
-        .eq("id", user.id);
+      await supabase.from("profiles").update({ name: profile.name, drone_model: profile.drone, experience_level: profile.experience }).eq("id", user.id);
     }
-
     setEditing(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
 
-  const expOption = EXP_OPTIONS.find((e) => e.value === profile.experience);
+  const addDrone = (name: string) => {
+    if (!profile.drones.includes(name)) {
+      const newDrones = [...profile.drones, name];
+      setProfile(prev => ({ ...prev, drones: newDrones, drone: prev.drone || name }));
+    }
+    setShowDroneAdd(false);
+    setDroneQuery("");
+  };
+
+  const removeDrone = (name: string) => {
+    const newDrones = profile.drones.filter(d => d !== name);
+    setProfile(prev => ({ ...prev, drones: newDrones, drone: prev.drone === name ? (newDrones[0] || "") : prev.drone }));
+  };
+
+  const setActiveDrone = (name: string) => {
+    setProfile(prev => ({ ...prev, drone: name }));
+  };
+
+  const pilotInfo = PILOT_TYPES[profile.pilotType];
+  const expInfo = EXP_OPTIONS[profile.experience];
   const initials = getInitials(profile.name);
+
+  const droneResults = useMemo(() => droneQuery.length >= 2 ? searchDrones(droneQuery) : [], [droneQuery]);
+
+  if (loading) return <main className="flex min-h-screen items-center justify-center bg-[#04090f]"><div className="h-[3px] w-48 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full w-full animate-loading-bar rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" /></div></main>;
 
   return (
     <main className="min-h-screen bg-[#04090f] text-white">
-      <div className="pointer-events-none fixed inset-0 opacity-80">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_34%)]" />
-      </div>
-
+      <div className="pointer-events-none fixed inset-0 opacity-80"><div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_34%)]" /></div>
       <div className="relative z-10 mx-auto w-full max-w-md px-5 pb-28 pt-6">
 
-        {/* Header */}
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/" className="grid h-11 w-11 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]">
-              <ArrowLeft size={18} />
-            </Link>
-            <h1 className="text-[24px] font-bold tracking-tight">Perfil</h1>
+            <Link href="/" className="grid h-11 w-11 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.05]"><ArrowLeft size={18} /></Link>
+            <h1 className="text-[22px] font-bold tracking-tight">Perfil do Piloto</h1>
           </div>
-          {!editing && profile.name && (
-            <button onClick={() => setEditing(true)}
-              className="flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.06] px-4 py-2.5 text-[13px] font-medium text-cyan-400 transition hover:bg-cyan-400/[0.1]">
-              <Edit3 size={14} /> Editar
-            </button>
+          {!editing && (
+            <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-2 text-[12px] font-medium text-cyan-400"><Edit3 size={13} /> Editar</button>
           )}
         </header>
 
-        {saved && (
-          <div className="mb-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] px-4 py-3.5 text-center text-[14px] font-medium text-emerald-300">
-            Perfil salvo com sucesso!
-          </div>
-        )}
-
-        {/* ═══ VIEWING MODE — flat layout, no container box ═══ */}
-        {!editing && profile.name && (
-          <section className="mb-10">
-            {/* avatar */}
-            <div className="mb-5 flex justify-center">
-              <div className="flex h-28 w-28 items-center justify-center rounded-full border-2 shadow-[0_0_30px_rgba(45,204,255,0.12)]"
-                style={{ borderColor: expOption?.color || "#2dccff", background: `${expOption?.color || "#2dccff"}0a` }}>
-                <span className="text-[36px] font-bold" style={{ color: expOption?.color || "#2dccff" }}>{initials}</span>
-              </div>
+        {/* ─── Profile Hero ─── */}
+        <section className="mb-6 relative overflow-hidden rounded-[22px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,18,32,0.98),rgba(4,9,15,1))] p-6">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,_rgba(45,204,255,0.06),_transparent_50%)]" />
+          <div className="relative z-10 flex flex-col items-center">
+            {/* Avatar */}
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border-2 shadow-[0_0_30px_rgba(45,204,255,0.12)]"
+              style={{ borderColor: expInfo?.color || "#334155", background: "rgba(255,255,255,0.03)" }}>
+              <span className="text-[28px] font-bold" style={{ color: expInfo?.color || "#94a3b8" }}>{initials}</span>
             </div>
 
-            {/* name */}
-            <h2 className="mb-2 text-center text-[26px] font-bold text-white">{profile.name}</h2>
-
-            {/* drones */}
-            {profile.drone && (
-              <div className="mb-3 text-center">
-                <p className="text-[15px] text-slate-400">{profile.drone}</p>
-                {profile.drones.length > 1 && (
-                  <p className="text-[11px] text-slate-600 mt-0.5">+{profile.drones.length - 1} {profile.drones.length === 2 ? "outro drone" : "outros drones"}</p>
-                )}
-              </div>
+            {/* Name */}
+            {editing ? (
+              <input value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} placeholder="Seu nome"
+                className="mb-3 w-full rounded-[12px] border border-white/[0.1] bg-white/[0.04] px-4 py-3 text-center text-[18px] font-bold text-white outline-none focus:border-cyan-400/30" />
+            ) : (
+              <h2 className="mb-1 text-[22px] font-bold text-white">{profile.name || "Piloto"}</h2>
             )}
 
-            {/* experience badge */}
-            {expOption && (
-              <div className="flex justify-center">
-                <div className="inline-flex items-center gap-2.5 rounded-full px-5 py-2.5"
-                  style={{ background: `${expOption.color}0d`, border: `1px solid ${expOption.color}22` }}>
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: expOption.color }} />
-                  <span className="text-[14px] font-semibold" style={{ color: expOption.color }}>{expOption.label}</span>
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* ═══ EDITING MODE — flat layout ═══ */}
-        {editing && (
-          <section className="mb-10">
-            {/* avatar */}
-            <div className="mb-5 flex justify-center">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-cyan-400/25 bg-cyan-400/[0.06]">
-                {initials ? (
-                  <span className="text-[30px] font-bold text-cyan-400">{initials}</span>
-                ) : (
-                  <User size={32} className="text-cyan-400/50" />
-                )}
-              </div>
-            </div>
-
-            {/* name input */}
-            <div className="mb-8">
-              <input
-                type="text"
-                value={profile.name}
-                onChange={(e) => update("name", e.target.value)}
-                placeholder="Nome do piloto"
-                className="w-full rounded-2xl border border-white/[0.1] bg-white/[0.04] px-5 py-4 text-center text-[17px] font-medium text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/30 transition"
-              />
-            </div>
-
-            {/* Drones — multiple selection */}
-            <div className="mb-6">
-              <p className="mb-2 text-[13px] font-medium text-slate-400">Meus drones</p>
-
-              {/* Currently selected drones */}
-              {profile.drones.length > 0 && (
-                <div className="mb-3 flex flex-col gap-2">
-                  {profile.drones.map((d, i) => (
-                    <div key={d} className="flex items-center gap-2 rounded-[14px] px-4 py-3"
-                      style={d === profile.drone ? { background: "rgba(45,204,255,0.08)", border: "1px solid rgba(45,204,255,0.25)" } : { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <button onClick={() => update("drone", d)} className="flex-1 text-left text-[14px] font-medium" style={{ color: d === profile.drone ? "#2dccff" : "#e2e8f0" }}>
-                        {d}
-                        {d === profile.drone && <span className="ml-2 text-[10px] uppercase tracking-wider text-cyan-400/60">ativo</span>}
-                      </button>
-                      <button onClick={() => {
-                        const newDrones = profile.drones.filter(dr => dr !== d);
-                        setProfile(prev => ({ ...prev, drones: newDrones, drone: prev.drone === d ? (newDrones[0] || "") : prev.drone }));
-                        setSaved(false);
-                      }} className="text-slate-600 transition hover:text-red-400"><X size={14} /></button>
-                    </div>
-                  ))}
+            {/* Badges */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+              {pilotInfo && (
+                <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5" style={{ background: `${pilotInfo.color}0d`, border: `1px solid ${pilotInfo.color}22` }}>
+                  <span style={{ color: pilotInfo.color }}>{pilotInfo.icon}</span>
+                  <span className="text-[11px] font-semibold" style={{ color: pilotInfo.color }}>{pilotInfo.label}</span>
                 </div>
               )}
-
-              {/* Add drone dropdown */}
-              <Dropdown
-                label="Adicionar drone"
-                value=""
-                placeholder="+ Adicionar outro drone"
-                open={droneOpen}
-                onToggle={() => { setDroneOpen(!droneOpen); setExpOpen(false); }}
-              >
-                {DRONE_CATEGORIES.map((cat) => (
-                  <div key={cat.category}>
-                    <p className="sticky top-0 bg-[#0b1424] px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-cyan-400/70 border-b border-white/[0.04]">
-                      {cat.category}
-                    </p>
-                    {cat.items.map((item) => {
-                      const alreadyAdded = profile.drones.includes(item);
-                      return (
-                        <button key={item}
-                          onClick={() => {
-                            if (!alreadyAdded) {
-                              const newDrones = [...profile.drones, item];
-                              setProfile(prev => ({ ...prev, drones: newDrones, drone: prev.drone || item }));
-                              setSaved(false);
-                            }
-                            setDroneOpen(false);
-                          }}
-                          disabled={alreadyAdded}
-                          className="flex w-full items-center px-5 py-3.5 text-[15px] text-left transition hover:bg-white/[0.04] disabled:opacity-30"
-                          style={alreadyAdded ? { color: "#64748b" } : { color: "#e2e8f0" }}>
-                          {item} {alreadyAdded && <span className="ml-auto text-[10px] text-slate-600">adicionado</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
-              </Dropdown>
-            </div>
-
-            {/* Experience dropdown */}
-            <div className="mb-8">
-              <Dropdown
-                label="Nível de experiência"
-                value={expOption?.label || ""}
-                placeholder="Selecione seu nível"
-                open={expOpen}
-                onToggle={() => { setExpOpen(!expOpen); setDroneOpen(false); }}
-              >
-                {EXP_OPTIONS.map((e) => (
-                  <button key={e.value}
-                    onClick={() => { update("experience", e.value); setExpOpen(false); }}
-                    className="flex w-full items-center gap-3.5 px-5 py-4 text-left transition hover:bg-white/[0.04]"
-                    style={profile.experience === e.value ? { background: `${e.color}0a` } : {}}>
-                    <span className="h-3 w-3 rounded-full shrink-0" style={{ background: e.color }} />
-                    <span className="text-[15px] font-medium" style={{ color: profile.experience === e.value ? e.color : "#e2e8f0" }}>
-                      {e.label}
-                    </span>
-                  </button>
-                ))}
-              </Dropdown>
-            </div>
-
-            {/* save */}
-            <button onClick={handleSave} disabled={!profile.name.trim()}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-4 text-[16px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed">
-              <Save size={17} /> Salvar perfil
-            </button>
-          </section>
-        )}
-
-        {/* Favorites */}
-        {favorites.length > 0 && (
-          <section className="mb-8">
-            <h3 className="mb-4 text-[16px] font-semibold text-slate-300">Locais favoritos</h3>
-            <div className="flex flex-col gap-2.5">
-              {favorites.map((fav: any) => (
-                <div key={fav.id}
-                  className="flex items-center gap-3 rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-4 transition hover:bg-white/[0.04]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400/10">
-                    <Star size={16} className="fill-amber-400 text-amber-400" />
-                  </div>
-                  <Link href={`/?lat=${fav.latitude}&lon=${fav.longitude}&name=${encodeURIComponent(fav.name)}`} className="flex-1">
-                    <p className="text-[15px] font-medium text-slate-200">{fav.name}</p>
-                    <p className="mt-0.5 text-[12px] text-slate-500">
-                      <MapPin size={10} className="inline mr-1" />
-                      {fav.latitude.toFixed(2)}, {fav.longitude.toFixed(2)}
-                    </p>
-                  </Link>
-                  <button
-                    onClick={async () => {
-                      await supabase.from("favorites").delete().eq("id", fav.id);
-                      setFavorites(favorites.filter((f: any) => f.id !== fav.id));
-                    }}
-                    className="grid h-9 w-9 place-items-center rounded-xl text-slate-600 transition hover:bg-red-400/10 hover:text-red-400">
-                    <Trash2 size={15} />
-                  </button>
+              {expInfo && (
+                <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5" style={{ background: `${expInfo.color}0d`, border: `1px solid ${expInfo.color}22` }}>
+                  <span className="h-2 w-2 rounded-full" style={{ background: expInfo.color }} />
+                  <span className="text-[11px] font-semibold" style={{ color: expInfo.color }}>{expInfo.label}</span>
                 </div>
-              ))}
+              )}
             </div>
-          </section>
-        )}
 
-        {/* Quick links */}
-        <section className="mb-8">
-          <h3 className="mb-4 text-[16px] font-semibold text-slate-300">Acesso rápido</h3>
-          <div className="flex flex-col gap-3">
-            {[
-              { href: "/configuracoes", icon: <Settings size={18} className="text-cyan-400" />, bg: "bg-cyan-400/10", title: "Configurações de voo", sub: "Limites personalizados", needsLogin: true },
-              { href: "/analise", icon: <Shield size={18} className="text-emerald-400" />, bg: "bg-emerald-400/10", title: "Análise detalhada", sub: "Como o score funciona", needsLogin: true },
-              { href: "/previsao", icon: <Clock3 size={18} className="text-amber-400" />, bg: "bg-amber-400/10", title: "Previsão completa", sub: "Próximas 24h e 16 dias", needsLogin: false },
-              { href: "/privacidade", icon: <Shield size={18} className="text-slate-400" />, bg: "bg-white/[0.04]", title: "Política de Privacidade", sub: "Como protegemos seus dados", needsLogin: false },
-              { href: "/termos", icon: <Globe size={18} className="text-slate-400" />, bg: "bg-white/[0.04]", title: "Termos de Uso", sub: "Regras de utilização", needsLogin: false },
-            ].map((link) => (
-              link.needsLogin && !isLoggedIn ? (
-                <button key={link.href} onClick={() => setShowLoginModal(true)}
-                  className="flex items-center gap-4 rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-5 transition hover:bg-white/[0.04] text-left w-full">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${link.bg}`}>{link.icon}</div>
-                  <div className="flex-1">
-                    <p className="text-[15px] font-medium text-slate-200">{link.title}</p>
-                    <p className="mt-0.5 text-[12px] text-slate-500">{link.sub}</p>
-                  </div>
-                </button>
-              ) : (
-                <Link key={link.href} href={link.href} className="flex items-center gap-4 rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-5 transition hover:bg-white/[0.04]">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${link.bg}`}>{link.icon}</div>
-                  <div className="flex-1">
-                    <p className="text-[15px] font-medium text-slate-200">{link.title}</p>
-                    <p className="mt-0.5 text-[12px] text-slate-500">{link.sub}</p>
-                  </div>
-                </Link>
-              )
-            ))}
+            {profile.anac && <p className="mt-2 text-[11px] text-slate-500">ANAC: {profile.anac}</p>}
           </div>
         </section>
 
-        {/* About */}
-        <section className="mb-6">
-          <button onClick={() => setShowAbout(!showAbout)}
-            className="flex w-full items-center justify-between rounded-[18px] border border-white/[0.06] bg-white/[0.025] px-5 py-5 text-left transition hover:bg-white/[0.04]">
-            <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
-                <Info size={18} className="text-slate-400" />
+        {/* ─── Edit fields (pilot type + exp + anac) ─── */}
+        {editing && (
+          <section className="mb-6 rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-5">
+            <div className="mb-4">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Tipo de piloto</label>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(PILOT_TYPES).map(([k, v]) => (
+                  <button key={k} onClick={() => setProfile(p => ({ ...p, pilotType: k }))}
+                    className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-left transition"
+                    style={profile.pilotType === k ? { background: `${v.color}0d`, border: `1px solid ${v.color}25` } : { background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                    <span style={{ color: profile.pilotType === k ? v.color : "#64748b" }}>{v.icon}</span>
+                    <span className="text-[11px] font-medium" style={{ color: profile.pilotType === k ? "#fff" : "#94a3b8" }}>{v.label}</span>
+                  </button>
+                ))}
               </div>
-              <span className="text-[15px] font-medium text-slate-200">Sobre o SkyFe</span>
             </div>
-            <ChevronDown size={18} className={`text-slate-500 transition-transform duration-200 ${showAbout ? "rotate-180" : ""}`} />
-          </button>
-
-          {showAbout && (
-            <div className="mt-3 rounded-[18px] border border-white/[0.04] bg-white/[0.02] p-6">
-              <div className="mb-5 flex items-center gap-4">
-                <div className="grid h-14 w-14 place-items-center rounded-[16px] border border-cyan-400/[0.15] bg-cyan-400/[0.06]">
-                  <div className="relative h-6 w-6">
-                    <span className="absolute left-0 top-0 h-[8px] w-[8px] rounded-full border-[1.5px] border-cyan-400/90" />
-                    <span className="absolute right-0 top-0 h-[8px] w-[8px] rounded-full border-[1.5px] border-cyan-400/90" />
-                    <span className="absolute bottom-0 left-0 h-[8px] w-[8px] rounded-full border-[1.5px] border-cyan-400/90" />
-                    <span className="absolute bottom-0 right-0 h-[8px] w-[8px] rounded-full border-[1.5px] border-cyan-400/90" />
-                    <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] bg-cyan-400" />
-                  </div>
-                </div>
-                <div>
-                  <h2 className="text-[20px] font-bold">Sky<span className="text-cyan-400">Fe</span></h2>
-                  <p className="text-[13px] text-slate-500">Versão 2.5.3</p>
-                </div>
+            <div className="mb-4">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Experiência</label>
+              <div className="flex flex-col gap-1">
+                {Object.entries(EXP_OPTIONS).map(([k, v]) => (
+                  <button key={k} onClick={() => setProfile(p => ({ ...p, experience: k }))}
+                    className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-left transition"
+                    style={profile.experience === k ? { background: `${v.color}0d`, border: `1px solid ${v.color}25` } : { background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)" }}>
+                    <span className="h-2 w-2 rounded-full" style={{ background: profile.experience === k ? v.color : "#334155" }} />
+                    <span className="text-[12px] font-medium" style={{ color: profile.experience === k ? v.color : "#94a3b8" }}>{v.label}</span>
+                  </button>
+                ))}
               </div>
-              <div className="mt-1 rounded-[16px] border border-cyan-400/10 bg-cyan-400/[0.03] p-4 mb-4">
-                <p className="text-[13px] leading-relaxed text-slate-400">
+            </div>
+            <div>
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Registro ANAC (opcional)</label>
+              <input value={profile.anac} onChange={e => setProfile(p => ({ ...p, anac: e.target.value }))} placeholder="Ex: PP-XYZ"
+                className="w-full rounded-[10px] border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-[13px] text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/20" />
+            </div>
+          </section>
+        )}
+
+        {/* ─── Drones section ─── */}
+        <section className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-[16px] font-bold text-slate-200">Meus drones</h3>
+            <button onClick={() => setShowDroneAdd(true)} className="flex items-center gap-1 text-[12px] font-medium text-cyan-400 transition hover:text-cyan-300">
+              <Plus size={14} /> Adicionar
+            </button>
+          </div>
+
+          {profile.drones.length === 0 ? (
+            <button onClick={() => setShowDroneAdd(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-[16px] border border-dashed border-white/[0.1] bg-white/[0.015] py-6 text-[13px] text-slate-500 transition hover:border-cyan-400/20 hover:text-slate-400">
+              <Plus size={16} /> Adicionar seu primeiro drone
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {profile.drones.map(d => {
+                const isActive = d === profile.drone;
+                return (
+                  <div key={d} className="flex items-center gap-3 rounded-[14px] px-4 py-3"
+                    style={isActive ? { background: "rgba(45,204,255,0.06)", border: "1px solid rgba(45,204,255,0.2)" } : { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <button onClick={() => setActiveDrone(d)} className="flex-1 text-left">
+                      <p className="text-[14px] font-medium" style={{ color: isActive ? "#22d3ee" : "#e2e8f0" }}>{d}</p>
+                      {isActive && <p className="text-[10px] uppercase tracking-wider text-cyan-400/60 mt-0.5">Drone ativo</p>}
+                    </button>
+                    {editing && (
+                      <button onClick={() => removeDrone(d)} className="text-slate-600 hover:text-red-400 transition"><X size={14} /></button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Add drone modal */}
+          {showDroneAdd && (
+            <div className="mt-3 rounded-[16px] border border-white/[0.08] bg-[#0b1221] overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06]">
+                <input value={droneQuery} onChange={e => setDroneQuery(e.target.value)} placeholder="Buscar drone..."
+                  autoFocus className="flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-slate-600" />
+                <button onClick={() => { setShowDroneAdd(false); setDroneQuery(""); }}><X size={14} className="text-slate-500" /></button>
+              </div>
+              <div className="max-h-[200px] overflow-y-auto">
+                {droneQuery.length >= 2 ? (
+                  droneResults.length > 0 ? droneResults.slice(0, 10).map(d => (
+                    <button key={d.id} onClick={() => addDrone(`${d.brand} ${d.name}`)}
+                      className="flex w-full items-center px-4 py-2.5 text-left border-b border-white/[0.03] hover:bg-white/[0.03]">
+                      <span className="flex-1 text-[13px] text-slate-200">{d.brand} {d.name}</span>
+                      <span className="text-[10px] text-slate-600">{d.maxWind} km/h</span>
+                    </button>
+                  )) : <p className="px-4 py-3 text-[12px] text-slate-500">Nenhum encontrado</p>
+                ) : <p className="px-4 py-3 text-[12px] text-slate-500">Digite para buscar...</p>}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Save button (when editing) */}
+        {editing && (
+          <button onClick={handleSave}
+            className="mb-6 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-4 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
+            <Save size={16} /> Salvar perfil
+          </button>
+        )}
+
+        {saved && (
+          <div className="mb-4 rounded-[14px] border border-emerald-400/20 bg-emerald-400/[0.06] px-4 py-3 text-center text-[14px] font-medium text-emerald-300">Perfil salvo!</div>
+        )}
+
+        {/* ─── Menu items ─── */}
+        <section className="mb-6 flex flex-col gap-2">
+          <Link href="/preferencias" className="flex items-center gap-3 rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-4 py-3.5 transition hover:bg-white/[0.04]">
+            <Globe size={18} className="text-slate-400" /><span className="flex-1 text-[14px] text-slate-200">Preferências do app</span><ChevronDown size={16} className="text-slate-600 -rotate-90" />
+          </Link>
+          <Link href="/configuracoes" className="flex items-center gap-3 rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-4 py-3.5 transition hover:bg-white/[0.04]">
+            <Shield size={18} className="text-slate-400" /><span className="flex-1 text-[14px] text-slate-200">Limites de voo</span><ChevronDown size={16} className="text-slate-600 -rotate-90" />
+          </Link>
+          <button onClick={() => setShowAbout(!showAbout)} className="flex items-center gap-3 rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-4 py-3.5 text-left transition hover:bg-white/[0.04]">
+            <Info size={18} className="text-slate-400" /><span className="flex-1 text-[14px] text-slate-200">Sobre o SkyFe</span><ChevronDown size={16} className={`text-slate-600 transition-transform ${showAbout ? "rotate-0" : "-rotate-90"}`} />
+          </button>
+          {showAbout && (
+            <div className="rounded-[14px] border border-white/[0.05] bg-white/[0.02] p-5">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="grid h-12 w-12 place-items-center rounded-[14px] border border-cyan-400/20 bg-white/[0.03]">
+                  <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] bg-cyan-400" />
+                </div>
+                <div><h2 className="text-[18px] font-bold">Sky<span className="text-cyan-400">Fe</span></h2><p className="text-[12px] text-slate-500">Versão 2.5.3</p></div>
+              </div>
+              <div className="rounded-[12px] border border-cyan-400/10 bg-cyan-400/[0.03] p-3 mb-3">
+                <p className="text-[12px] leading-relaxed text-slate-400">
                   O SkyFe cruza dados meteorológicos de múltiplas fontes internacionais com algoritmos proprietários para transformar informações complexas em uma resposta simples e visual. Combinamos previsões atmosféricas em tempo real, monitoramento geomagnético via satélites da NOAA, mapeamento de espaço aéreo com dados oficiais e inteligência de altitude de vento — tudo processado instantaneamente para oferecer a pilotos de drone a melhor tomada de decisão antes de cada voo.
                 </p>
               </div>
-              <div className="flex flex-col gap-2.5 text-[13px] text-slate-500">
-                <div className="flex items-center gap-2.5"><Globe size={14} className="text-slate-600" /><span>Dados: Open-Meteo & NOAA</span></div>
-                <div className="flex items-center gap-2.5"><Map size={14} className="text-slate-600" /><span>Mapas: OpenStreetMap & OurAirports</span></div>
+              <div className="flex flex-col gap-1.5 text-[12px] text-slate-500">
+                <div className="flex items-center gap-2"><Globe size={13} className="text-slate-600" /><span>Dados: Open-Meteo & NOAA</span></div>
+                <div className="flex items-center gap-2"><Map size={13} className="text-slate-600" /><span>Mapas: OpenStreetMap & OurAirports</span></div>
               </div>
-              <p className="mt-5 text-[12px] text-slate-600">Desenvolvido por SkyFe Tecnologia © 2025–2026</p>
+              <p className="mt-3 text-[11px] text-slate-600">Desenvolvido por SkyFe Tecnologia © 2025–2026</p>
             </div>
           )}
         </section>
 
-        {/* Auth action */}
-        <section className="mb-6">
-          {isLoggedIn ? (
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                window.location.href = "/";
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-[18px] border border-red-400/15 bg-red-400/[0.04] px-5 py-4 text-[15px] font-medium text-red-400 transition hover:bg-red-400/[0.08]"
-            >
-              Sair da conta
-            </button>
-          ) : (
-            <a
-              href="/login"
-              className="flex w-full items-center justify-center gap-2 rounded-[18px] bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-4 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105"
-            >
-              Entrar / Criar conta grátis
-            </a>
-          )}
-        </section>
+        {/* Auth */}
+        {!isLoggedIn ? (
+          <Link href="/login" className="flex w-full items-center justify-center gap-2 rounded-[18px] bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-4 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
+            <User size={18} /> Criar conta / Entrar
+          </Link>
+        ) : (
+          <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
+            className="flex w-full items-center justify-center gap-2 rounded-[18px] border border-red-400/15 bg-red-400/[0.04] py-3.5 text-[14px] font-medium text-red-300 transition hover:bg-red-400/[0.08]">
+            Sair da conta
+          </button>
+        )}
       </div>
 
-      {/* Login Prompt Modal */}
-      {showLoginModal && (
-        <LoginPromptModal feature="" onClose={() => setShowLoginModal(false)} />
-      )}
-
-      {/* Bottom nav */}
+      {/* Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#04090f]/80 backdrop-blur-2xl">
         <div className="mx-auto grid max-w-md grid-cols-4 px-4 py-2.5 text-center text-[11px]">
           {[
@@ -539,6 +358,8 @@ function Perfil() {
           ))}
         </div>
       </nav>
+
+      {showLoginModal && <LoginPromptModal feature="perfil" onClose={() => setShowLoginModal(false)} />}
     </main>
   );
 }

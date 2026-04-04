@@ -244,6 +244,87 @@ function HourlyCard({ item }: { item: HourlyItem }) {
   );
 }
 
+/* ───── Share Image Generator (1080x1080) ───── */
+async function generateShareImage(
+  score: number, level: Level, label: string, location: string,
+  wind: number, gust: number, rainP: number, temp: number, kp: number,
+  sunTimes: { sunrise: string; sunset: string } | null
+) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080; canvas.height = 1080;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const color = LC[level];
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  const bg = ctx.createRadialGradient(540, 400, 0, 540, 540, 700);
+  bg.addColorStop(0, "#0a1628"); bg.addColorStop(1, "#04090f");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 1080, 1080);
+
+  const glow = ctx.createRadialGradient(540, 350, 0, 540, 350, 400);
+  glow.addColorStop(0, `${color}12`); glow.addColorStop(1, "transparent");
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, 1080, 1080);
+
+  ctx.font = "bold 42px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
+  ctx.fillText("Sky", 510, 80);
+  ctx.fillStyle = "#22d3ee"; ctx.fillText("Fe", 568, 80);
+
+  ctx.font = "500 24px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.fillStyle = "#94a3b8"; ctx.textAlign = "center";
+  ctx.fillText(location.length > 45 ? location.substring(0, 42) + "..." : location, 540, 130);
+
+  ctx.font = "400 20px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.fillStyle = "#475569";
+  ctx.fillText(`${dateStr} · ${timeStr}`, 540, 165);
+
+  ctx.beginPath(); ctx.arc(540, 380, 160, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 12; ctx.stroke();
+  ctx.beginPath(); ctx.arc(540, 380, 160, -Math.PI / 2, -Math.PI / 2 + (score / 100) * Math.PI * 2);
+  ctx.strokeStyle = color; ctx.lineWidth = 12; ctx.lineCap = "round"; ctx.stroke();
+
+  ctx.font = "bold 120px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.fillStyle = color; ctx.textAlign = "center"; ctx.fillText(`${score}`, 540, 410);
+  ctx.font = "400 28px -apple-system, sans-serif"; ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.fillText("/100", 540, 450);
+
+  ctx.font = "bold 32px -apple-system, sans-serif";
+  ctx.fillStyle = color; ctx.fillText(label.toUpperCase(), 540, 600);
+
+  const msg = level === "good" ? "Condições ideais para voo de drone" : level === "warn" ? "Voo possível com atenção requerida" : "Condições adversas — voo não recomendado";
+  ctx.font = "400 22px -apple-system, sans-serif"; ctx.fillStyle = "#94a3b8"; ctx.fillText(msg, 540, 645);
+
+  const metrics = [{ l: "Vento", v: `${wind} km/h`, i: "💨" }, { l: "Rajada", v: `${gust} km/h`, i: "⚡" }, { l: "Chuva", v: `${rainP}%`, i: "🌧" }, { l: "Temp", v: `${temp}°C`, i: "🌡" }, { l: "Kp", v: `${kp.toFixed(1)}`, i: "📡" }];
+  const cW = 170, cH = 90, gap = 18;
+  const totalW = metrics.length * cW + (metrics.length - 1) * gap;
+  let sX = (1080 - totalW) / 2;
+  metrics.forEach((m, i) => {
+    const x = sX + i * (cW + gap), y = 700;
+    ctx.fillStyle = "rgba(255,255,255,0.03)"; ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(x, y, cW, cH, 16); ctx.fill(); ctx.stroke();
+    ctx.font = "400 18px -apple-system, sans-serif"; ctx.fillStyle = "#64748b"; ctx.textAlign = "center"; ctx.fillText(`${m.i} ${m.l}`, x + cW / 2, y + 32);
+    ctx.font = "bold 24px -apple-system, sans-serif"; ctx.fillStyle = "#e2e8f0"; ctx.fillText(m.v, x + cW / 2, y + 65);
+  });
+
+  if (sunTimes) { ctx.font = "400 20px -apple-system, sans-serif"; ctx.fillStyle = "#64748b"; ctx.textAlign = "center"; ctx.fillText(`☀️ ${sunTimes.sunrise}  ·  🌅 ${sunTimes.sunset}`, 540, 840); }
+
+  ctx.font = "600 20px -apple-system, sans-serif"; ctx.fillStyle = "#22d3ee"; ctx.textAlign = "center"; ctx.fillText("app.skyfe.com.br", 540, 940);
+  ctx.font = "400 16px -apple-system, sans-serif"; ctx.fillStyle = "#475569"; ctx.fillText("Baixe grátis — É seguro voar agora?", 540, 970);
+  ctx.strokeStyle = `${color}15`; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(20, 20, 1040, 1040, 24); ctx.stroke();
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+    const file = new File([blob], `skyfe-score-${score}.png`, { type: "image/png" });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: `SkyFe — Score ${score}`, text: `${label} — ${location}` }); return; } catch {}
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `skyfe-score-${score}.png`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }, "image/png");
+}
+
 /* ═══════════════════════════════════════════ */
 /*                   HOME                      */
 /* ═══════════════════════════════════════════ */
@@ -520,20 +601,27 @@ function HomeContent() {
           <WindCompass direction={windDir} speed={Math.round(wind10m)} gust={Math.round(gust10m)} />
         </section>
 
-        {/* ─── 9. CHECKLIST PRÉ-VOO + VER ANÁLISE DETALHADA ─── */}
-        <div className="mb-6 flex gap-3">
+        {/* ─── 9. CHECKLIST + ANÁLISE + COMPARTILHAR ─── */}
+        <div className="mb-3 flex gap-3">
           <Link href="/checklist"
-            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] py-4 text-[15px] font-medium text-slate-300 transition hover:bg-white/[0.05]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] py-4 text-[14px] font-medium text-slate-300 transition hover:bg-white/[0.05]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             Checklist
           </Link>
           <button onClick={() => {
             if (!isLoggedIn) { setLoginFeature("análise detalhada"); setShowLoginModal(true); }
             else { window.location.href = `/analise?lat=${currentLat}&lon=${currentLon}&name=${encodeURIComponent(placeName)}`; }
-          }} className="flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-4 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
+          }} className="flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-4 text-[14px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
             Ver análise
           </button>
         </div>
+
+        {/* Share button */}
+        <button onClick={() => generateShareImage(score, level, label, placeName, Math.round(wind10m), Math.round(gust10m), rainP, temp, kpIndex, sunTimes)}
+          className="mb-6 flex w-full items-center justify-center gap-2 rounded-full border border-cyan-400/15 bg-cyan-400/[0.04] py-3.5 text-[14px] font-medium text-cyan-400 transition hover:bg-cyan-400/[0.06]">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Compartilhar condições
+        </button>
 
         {showLoginModal && (<LoginPromptModal feature={loginFeature} onClose={() => setShowLoginModal(false)} />)}
 
