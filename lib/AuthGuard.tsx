@@ -107,12 +107,22 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const check = async () => {
       // Páginas que não exigem login
       const path = window.location.pathname;
-      if (path === "/login" || path === "/auth/callback" || path === "/privacidade" || path === "/termos") {
+      if (path === "/" || path === "/login" || path === "/auth/callback" || path === "/privacidade" || path === "/termos" || path === "/onboarding") {
+        // Home (clima) funciona sem login, mas verifica onboarding
+        if (path === "/") {
+          try {
+            const done = localStorage.getItem("skyfe-onboarding-done") === "true";
+            if (!done) {
+              window.location.href = "/onboarding";
+              return;
+            }
+          } catch {}
+        }
         setReady(true);
         return;
       }
 
-      // Verificar se está logado
+      // Todas as outras páginas exigem login
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         window.location.href = "/login";

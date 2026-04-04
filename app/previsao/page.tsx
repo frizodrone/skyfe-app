@@ -108,7 +108,7 @@ export default function PrevisaoPage() {
             const hvis = weather.hourly.visibility?.[h] ?? 24140;
             const hcc = weather.hourly.cloud_cover?.[h] ?? 0;
             const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht, kp: hkp, visibility: hvis, cloudCover: hcc });
-            dayHours.push({ time: weather.hourly.time[h], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: hres.score, level: hres.level, wind: Math.round(hw), gust: Math.round(hg), rainP: Math.round(hr), temp: Math.round(ht), kp: parseFloat(hkp.toFixed(1)) });
+            dayHours.push({ time: weather.hourly.time[h], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: hres.score, level: hres.level, wind: Math.round(hw), gust: Math.round(hg), rainP: Math.round(hr), temp: Math.round(ht), kp: parseFloat(hkp.toFixed(1)), visibility: hvis, cloudCover: hcc });
           }
         }
       }
@@ -269,12 +269,12 @@ export default function PrevisaoPage() {
                   <div className="mt-2 ml-2 mr-2 rounded-2xl border border-white/[0.04] bg-white/[0.02] p-3">
                     <div className="flex flex-col gap-2">
                       {day.hours.map((h) => (
-                        <div key={h.time} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: `${LC[h.level]}06` }}>
+                        <button key={h.time} onClick={() => setPopupItem(h)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-white/[0.03]" style={{ background: `${LC[h.level]}06` }}>
                           <span className="h-[9px] w-[9px] shrink-0 rounded-full" style={{ background: LC[h.level] }} />
                           <span className="w-[50px] text-[13px] font-medium text-slate-200">{h.hour}</span>
                           <span className="w-[32px] text-[14px] font-bold" style={{ color: LC[h.level] }}>{h.score}</span>
                           <span className="flex-1 text-[11px] text-slate-500">{h.wind}km/h · {h.rainP}% · {h.temp}°</span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
