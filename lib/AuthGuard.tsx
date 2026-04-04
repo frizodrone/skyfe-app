@@ -35,108 +35,137 @@ export function useIsLoggedIn() {
   return isLoggedIn;
 }
 
-// Modal de convite para login
+// Modal de convite para login — premium e convincente
 export function LoginPromptModal({ onClose, feature }: { onClose: () => void; feature: string }) {
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-6"
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md px-0 sm:px-6"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-sm rounded-[28px] border border-cyan-400/20 bg-[#0b1221] p-7 shadow-[0_0_60px_rgba(45,204,255,0.1)]">
+      <div className="w-full max-w-md rounded-t-[32px] sm:rounded-[32px] border border-cyan-400/15 bg-[#0a1222] px-7 pt-8 pb-10 shadow-[0_-20px_60px_rgba(0,0,0,0.5),0_0_80px_rgba(45,204,255,0.08)] relative overflow-hidden">
+
+        {/* Background glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[200px] bg-[radial-gradient(ellipse,rgba(34,211,238,0.08),transparent_60%)] pointer-events-none" />
+
+        {/* Close button */}
+        <button onClick={onClose} className="absolute right-5 top-5 grid h-8 w-8 place-items-center rounded-full bg-white/[0.04] text-slate-500 transition hover:bg-white/[0.08] hover:text-white">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+
+        {/* Drag indicator (mobile) */}
+        <div className="sm:hidden absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/10" />
+
         {/* Logo */}
-        <div className="mb-5 flex justify-center">
-          <div className="grid h-16 w-16 place-items-center rounded-[20px] border border-cyan-400/20 bg-white/[0.03]">
-            <div className="relative h-[24px] w-[24px]">
-              <span className="absolute left-0 top-0 h-[8px] w-[8px] rounded-full border-[2px] border-cyan-400/90" />
-              <span className="absolute right-0 top-0 h-[8px] w-[8px] rounded-full border-[2px] border-cyan-400/90" />
-              <span className="absolute left-0 bottom-0 h-[8px] w-[8px] rounded-full border-[2px] border-cyan-400/90" />
-              <span className="absolute right-0 bottom-0 h-[8px] w-[8px] rounded-full border-[2px] border-cyan-400/90" />
-              <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] bg-cyan-400" />
+        <div className="relative z-10 mb-6 flex justify-center">
+          <div className="grid h-[72px] w-[72px] place-items-center rounded-[22px] border border-cyan-400/20 bg-white/[0.03] shadow-[0_0_40px_rgba(45,204,255,0.12)]">
+            <div className="relative h-[28px] w-[28px]">
+              <span className="absolute left-0 top-0 h-[9px] w-[9px] rounded-full border-[2px] border-cyan-400 animate-pulse" style={{ animationDelay: "0s" }} />
+              <span className="absolute right-0 top-0 h-[9px] w-[9px] rounded-full border-[2px] border-cyan-400 animate-pulse" style={{ animationDelay: "0.15s" }} />
+              <span className="absolute left-0 bottom-0 h-[9px] w-[9px] rounded-full border-[2px] border-cyan-400 animate-pulse" style={{ animationDelay: "0.3s" }} />
+              <span className="absolute right-0 bottom-0 h-[9px] w-[9px] rounded-full border-[2px] border-cyan-400 animate-pulse" style={{ animationDelay: "0.45s" }} />
+              <span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-[4px] bg-cyan-400" />
             </div>
           </div>
         </div>
 
-        <h2 className="mb-3 text-center text-[20px] font-bold text-white">
-          Desbloqueie todo o SkyFe
-        </h2>
-        <p className="mb-5 text-center text-[14px] leading-relaxed text-slate-400">
-          Crie sua conta grátis e aproveite o aplicativo em sua <span className="text-white font-medium">total funcionalidade</span>:
-        </p>
+        <div className="relative z-10">
+          <h2 className="mb-2 text-center text-[24px] font-bold text-white leading-tight">
+            Crie sua conta grátis<br />e desbloqueie tudo
+          </h2>
+          <p className="mb-6 text-center text-[14px] leading-relaxed text-slate-400">
+            Leva menos de 30 segundos. Sem cartão de crédito.
+          </p>
 
-        {/* Benefits list */}
-        <div className="mb-6 flex flex-col gap-2.5 text-[13px] text-slate-300">
-          <div className="flex items-center gap-2.5">
-            <span className="h-[6px] w-[6px] rounded-full bg-cyan-400 shrink-0" />
-            Análise detalhada por fator de risco
+          {/* Benefits — visual cards */}
+          <div className="mb-7 grid grid-cols-2 gap-2.5">
+            <div className="flex items-center gap-2.5 rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
+              <span className="text-[18px]">🗺️</span>
+              <span className="text-[12px] font-medium text-slate-300">Mapa de zonas aéreas</span>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
+              <span className="text-[18px]">📊</span>
+              <span className="text-[12px] font-medium text-slate-300">Análise detalhada</span>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
+              <span className="text-[18px]">⏱️</span>
+              <span className="text-[12px] font-medium text-slate-300">Previsão 16 dias</span>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
+              <span className="text-[18px]">✅</span>
+              <span className="text-[12px] font-medium text-slate-300">Checklist pré-voo</span>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
+              <span className="text-[18px]">📱</span>
+              <span className="text-[12px] font-medium text-slate-300">Compartilhar score</span>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-[14px] border border-white/[0.05] bg-white/[0.02] px-3.5 py-3">
+              <span className="text-[18px]">⭐</span>
+              <span className="text-[12px] font-medium text-slate-300">Locais favoritos</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2.5">
-            <span className="h-[6px] w-[6px] rounded-full bg-emerald-400 shrink-0" />
-            Salvar locais favoritos
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="h-[6px] w-[6px] rounded-full bg-amber-400 shrink-0" />
-            Personalizar limites do seu drone
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="h-[6px] w-[6px] rounded-full bg-purple-400 shrink-0" />
-            Perfil com dados salvos na nuvem
+
+          {/* CTA button */}
+          <a href="/login"
+            className="mb-3 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-4 text-[16px] font-bold text-slate-950 shadow-[0_4px_30px_rgba(45,204,255,0.25)] transition hover:shadow-[0_4px_50px_rgba(45,204,255,0.35)] hover:brightness-105 active:scale-[0.98]">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Criar conta grátis
+          </a>
+
+          <a href="/login"
+            className="flex w-full items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] py-3.5 text-[14px] font-medium text-slate-300 transition hover:bg-white/[0.06]">
+            Já tenho conta — Entrar
+          </a>
+
+          <div className="mt-5 flex items-center justify-center gap-4 text-[11px] text-slate-600">
+            <span className="flex items-center gap-1.5"><span className="h-[5px] w-[5px] rounded-full bg-emerald-400/60" />100% gratuito</span>
+            <span className="flex items-center gap-1.5"><span className="h-[5px] w-[5px] rounded-full bg-emerald-400/60" />Sem anúncios</span>
+            <span className="flex items-center gap-1.5"><span className="h-[5px] w-[5px] rounded-full bg-emerald-400/60" />Sem cartão</span>
           </div>
         </div>
-
-        <a href="/login"
-          className="mb-3 flex w-full items-center justify-center rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 py-3.5 text-[15px] font-semibold text-slate-950 shadow-[0_0_24px_rgba(45,204,255,0.18)] transition hover:brightness-105">
-          Criar conta grátis
-        </a>
-
-        <button onClick={onClose}
-          className="flex w-full items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] py-3.5 text-[14px] font-medium text-slate-400 transition hover:bg-white/[0.05]">
-          Continuar sem conta
-        </button>
-
-        <p className="mt-4 text-center text-[11px] text-slate-600">
-          100% gratuito — sem cartão de crédito
-        </p>
       </div>
     </div>
   );
 }
 
-// AuthGuard — login obrigatório + onboarding no primeiro uso
+// AuthGuard — onboarding obrigatório na primeira vez + login para páginas além do clima
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const check = async () => {
-      // Páginas que não exigem login
       const path = window.location.pathname;
-      if (path === "/" || path === "/login" || path === "/auth/callback" || path === "/privacidade" || path === "/termos" || path === "/onboarding") {
-        // Home (clima) funciona sem login, mas verifica onboarding
-        if (path === "/") {
-          try {
-            const done = localStorage.getItem("skyfe-onboarding-done") === "true";
-            if (!done) {
-              window.location.href = "/onboarding";
-              return;
-            }
-          } catch {}
-        }
+
+      // Páginas que sempre funcionam sem nada
+      if (path === "/login" || path === "/auth/callback" || path === "/privacidade" || path === "/termos") {
         setReady(true);
         return;
       }
 
-      // Todas as outras páginas exigem login
+      // Onboarding: sempre acessível, é o primeiro passo
+      if (path === "/onboarding") {
+        setReady(true);
+        return;
+      }
+
+      // PASSO 1: Verificar se onboarding foi feito (obrigatório antes de tudo)
+      try {
+        const done = localStorage.getItem("skyfe-onboarding-done") === "true";
+        if (!done) {
+          window.location.href = "/onboarding";
+          return;
+        }
+      } catch {}
+
+      // PASSO 2: Home/Clima funciona sem login
+      if (path === "/") {
+        setReady(true);
+        return;
+      }
+
+      // PASSO 3: Todas as outras páginas exigem login
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         window.location.href = "/login";
         return;
       }
-
-      // Verificar se onboarding foi concluído
-      try {
-        const done = localStorage.getItem("skyfe-onboarding-done") === "true";
-        if (!done && path !== "/onboarding") {
-          window.location.href = "/onboarding";
-          return;
-        }
-      } catch {}
 
       setReady(true);
     };

@@ -6,6 +6,13 @@ export const metadata: Metadata = {
   description: "Veja agora se é seguro voar seu drone em qualquer lugar do mundo. Score de voo, previsão de 16 dias, mapa de zonas aéreas. 100% gratuito.",
   manifest: "/manifest.json",
   themeColor: "#04090f",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/icons/icon-192.png",
+  },
   openGraph: {
     title: "SkyFe — Condições de Voo para Drones em Tempo Real",
     description: "Veja agora se é seguro voar seu drone em qualquer lugar do mundo. Score de voo, previsão de 16 dias e mapa de zonas aéreas.",
