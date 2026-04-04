@@ -5,77 +5,101 @@ import Link from "next/link";
 import {
   ArrowLeft, Check, RotateCcw, Battery, Wifi, HardDrive, Settings2,
   Shield, MapPin, FileText, Eye, Wind, Compass, Sun, Map, Clock3, User,
+  CloudRain, Plane, Radio, Navigation,
 } from "lucide-react";
 
-type CheckItem = {
-  id: string;
-  label: string;
-  category: string;
-  icon: string;
-};
+type CheckItem = { id: string; label: string; category: string; icon: string };
 
 const CHECKLIST_ITEMS: CheckItem[] = [
-  // Equipamento
   { id: "battery-charged", label: "Baterias carregadas (drone + controle)", category: "Equipamento", icon: "battery" },
   { id: "propellers", label: "Hélices verificadas e sem danos", category: "Equipamento", icon: "settings" },
   { id: "sd-card", label: "Cartão SD inserido e com espaço", category: "Equipamento", icon: "hdd" },
   { id: "firmware", label: "Firmware do drone atualizado", category: "Equipamento", icon: "wifi" },
   { id: "gimbal", label: "Gimbal e câmera funcionando", category: "Equipamento", icon: "eye" },
   { id: "motors", label: "Motores sem obstruções", category: "Equipamento", icon: "settings" },
-
-  // Condições
   { id: "weather-check", label: "Condições climáticas verificadas no SkyFe", category: "Condições", icon: "wind" },
   { id: "wind-ok", label: "Vento dentro dos limites do drone", category: "Condições", icon: "wind" },
   { id: "no-rain", label: "Sem chuva prevista no horário", category: "Condições", icon: "cloud" },
   { id: "daylight", label: "Horário entre nascer e pôr do sol", category: "Condições", icon: "sun" },
   { id: "visibility-ok", label: "Visibilidade adequada para VLOS", category: "Condições", icon: "eye" },
-
-  // Regulamentação
   { id: "sarpas", label: "Acesso solicitado no SARPAS/DECEA", category: "Regulamentação", icon: "shield" },
   { id: "anac", label: "Cadastro SISANT/ANAC em dia", category: "Regulamentação", icon: "file" },
   { id: "no-fly-zone", label: "Local verificado no mapa de zonas", category: "Regulamentação", icon: "map" },
   { id: "distance-people", label: "30m de distância de pessoas não anuentes", category: "Regulamentação", icon: "map" },
   { id: "max-height", label: "Altura máxima de 120m respeitada", category: "Regulamentação", icon: "compass" },
-
-  // Operacional
-  { id: "home-point", label: "Ponto de retorno (Home) definido", category: "Operacional", icon: "map" },
+  { id: "home-point", label: "Ponto de retorno (Home) definido", category: "Operacional", icon: "nav" },
   { id: "rth-altitude", label: "Altitude de RTH configurada", category: "Operacional", icon: "compass" },
   { id: "compass-calibrated", label: "Bússola calibrada (se necessário)", category: "Operacional", icon: "compass" },
-  { id: "gps-lock", label: "Sinal GPS com lock suficiente", category: "Operacional", icon: "map" },
+  { id: "gps-lock", label: "Sinal GPS com lock suficiente", category: "Operacional", icon: "radio" },
   { id: "observer", label: "Observador posicionado (se necessário)", category: "Operacional", icon: "eye" },
 ];
+
+const CATEGORY_CONFIG: Record<string, { color: string; emoji: string }> = {
+  "Equipamento": { color: "#22d3ee", emoji: "🔧" },
+  "Condições": { color: "#2dffb3", emoji: "🌤" },
+  "Regulamentação": { color: "#ffd84d", emoji: "📋" },
+  "Operacional": { color: "#a78bfa", emoji: "🚀" },
+};
 
 const STORAGE_KEY = "skyfe-checklist";
 
 function getIcon(type: string, size: number = 16) {
-  switch (type) {
-    case "battery": return <Battery size={size} />;
-    case "wifi": return <Wifi size={size} />;
-    case "hdd": return <HardDrive size={size} />;
-    case "settings": return <Settings2 size={size} />;
-    case "shield": return <Shield size={size} />;
-    case "map": return <MapPin size={size} />;
-    case "file": return <FileText size={size} />;
-    case "eye": return <Eye size={size} />;
-    case "wind": return <Wind size={size} />;
-    case "compass": return <Compass size={size} />;
-    case "sun": return <Sun size={size} />;
-    case "cloud": return <Wind size={size} />;
-    default: return <Check size={size} />;
-  }
+  const map: Record<string, React.ReactNode> = {
+    battery: <Battery size={size} />, wifi: <Wifi size={size} />, hdd: <HardDrive size={size} />,
+    settings: <Settings2 size={size} />, shield: <Shield size={size} />, map: <MapPin size={size} />,
+    file: <FileText size={size} />, eye: <Eye size={size} />, wind: <Wind size={size} />,
+    compass: <Compass size={size} />, sun: <Sun size={size} />, cloud: <CloudRain size={size} />,
+    plane: <Plane size={size} />, radio: <Radio size={size} />, nav: <Navigation size={size} />,
+  };
+  return map[type] || <Check size={size} />;
+}
+
+/* ───── Circular Progress ───── */
+function CircularProgress({ pct, done, total, allDone }: { pct: number; done: number; total: number; allDone: boolean }) {
+  const r = 58;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+  const color = allDone ? "#2dffb3" : pct > 60 ? "#ffd84d" : pct > 30 ? "#22d3ee" : "#64748b";
+
+  return (
+    <div className="relative h-[150px] w-[150px]">
+      <svg width="150" height="150" viewBox="0 0 150 150">
+        <circle cx="75" cy="75" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+        <circle cx="75" cy="75" r={r} fill="none" stroke={color} strokeWidth="8"
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          transform="rotate(-90 75 75)"
+          style={{ filter: `drop-shadow(0 0 10px ${color}44)`, transition: "stroke-dashoffset 0.8s ease-out, stroke 0.5s ease" }} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        {allDone ? (
+          <>
+            <span className="text-[28px]">✈️</span>
+            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mt-1">Pronto!</span>
+          </>
+        ) : (
+          <>
+            <span className="text-[32px] font-bold text-white">{done}</span>
+            <span className="text-[12px] text-slate-500">de {total}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function ChecklistPage() {
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const data = JSON.parse(raw);
-        // Only restore if saved today
         if (data.date === new Date().toISOString().split("T")[0]) {
           setChecked(new Set(data.items));
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
         }
       }
     } catch {}
@@ -86,19 +110,23 @@ export default function ChecklistPage() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      // Save to localStorage
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           date: new Date().toISOString().split("T")[0],
           items: Array.from(next),
         }));
       } catch {}
+      if (next.size === CHECKLIST_ITEMS.length && !prev.has(id)) {
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 3000);
+      }
       return next;
     });
   };
 
   const resetAll = () => {
     setChecked(new Set());
+    setShowConfetti(false);
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
   };
 
@@ -106,8 +134,6 @@ export default function ChecklistPage() {
   const done = checked.size;
   const pct = Math.round((done / total) * 100);
   const allDone = done === total;
-
-  // Group by category
   const categories = Array.from(new Set(CHECKLIST_ITEMS.map(i => i.category)));
 
   return (
@@ -115,6 +141,35 @@ export default function ChecklistPage() {
       <div className="pointer-events-none fixed inset-0 opacity-80">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,204,255,0.08),_transparent_34%)]" />
       </div>
+
+      {/* Confetti */}
+      {showConfetti && (
+        <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden">
+          {Array.from({ length: 40 }, (_, i) => {
+            const colors = ["#2dffb3", "#22d3ee", "#ffd84d", "#a78bfa", "#ff5a5f", "#34d399"];
+            const c = colors[i % colors.length];
+            const left = Math.random() * 100;
+            const delay = Math.random() * 0.5;
+            const duration = 2 + Math.random() * 2;
+            const size = 4 + Math.random() * 8;
+            return (
+              <div key={i} className="absolute" style={{
+                left: `${left}%`, top: "-10px",
+                width: `${size}px`, height: `${size}px`,
+                borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+                background: c,
+                animation: `confettiFall ${duration}s ease-in ${delay}s forwards`,
+              }} />
+            );
+          })}
+          <style>{`
+            @keyframes confettiFall {
+              0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+              100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+            }
+          `}</style>
+        </div>
+      )}
 
       <div className="relative z-10 mx-auto w-full max-w-md px-5 pb-28 pt-6">
         {/* Header */}
@@ -126,69 +181,79 @@ export default function ChecklistPage() {
             <h1 className="text-[22px] font-bold tracking-tight">Checklist pré-voo</h1>
             <p className="text-[12px] text-slate-500">Verifique antes de decolar</p>
           </div>
-          <button onClick={resetAll} className="grid h-11 w-11 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-slate-400 transition hover:bg-white/[0.05] hover:text-white" title="Resetar checklist">
-            <RotateCcw size={17} />
-          </button>
         </header>
 
-        {/* Progress bar */}
-        <div className="mb-8 rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[14px] font-semibold text-slate-200">Progresso</span>
-            <span className="text-[14px] font-bold" style={{ color: allDone ? "#2dffb3" : pct > 50 ? "#ffd84d" : "#94a3b8" }}>{done}/{total}</span>
-          </div>
-          <div className="h-[8px] w-full overflow-hidden rounded-full bg-white/[0.06]">
-            <div className="h-full rounded-full transition-all duration-500 ease-out" style={{
-              width: `${pct}%`,
-              background: allDone ? "linear-gradient(90deg, #2dffb3, #34d399)" : pct > 50 ? "linear-gradient(90deg, #ffd84d, #f59e0b)" : "linear-gradient(90deg, #94a3b8, #64748b)",
-              boxShadow: allDone ? "0 0 12px rgba(45,255,179,0.3)" : undefined,
-            }} />
-          </div>
-          {allDone && (
-            <div className="mt-3 flex items-center justify-center gap-2 text-[13px] font-semibold text-emerald-400">
-              <Check size={16} />
-              Checklist completo — pronto para decolar!
+        {/* Circular progress hero */}
+        <div className="mb-8 flex flex-col items-center">
+          <CircularProgress pct={pct} done={done} total={total} allDone={allDone} />
+          {allDone ? (
+            <div className="mt-4 rounded-full bg-emerald-400/10 border border-emerald-400/20 px-5 py-2.5">
+              <p className="text-[14px] font-semibold text-emerald-400">Checklist completo — pronto para decolar!</p>
             </div>
+          ) : (
+            <p className="mt-4 text-[13px] text-slate-500">{total - done} {total - done === 1 ? "item restante" : "itens restantes"}</p>
           )}
         </div>
 
-        {/* Items by category */}
+        {/* Categories */}
         {categories.map((cat) => {
           const items = CHECKLIST_ITEMS.filter(i => i.category === cat);
           const catDone = items.filter(i => checked.has(i.id)).length;
-          const catColor = catDone === items.length ? "#2dffb3" : catDone > 0 ? "#ffd84d" : "#64748b";
+          const catComplete = catDone === items.length;
+          const cfg = CATEGORY_CONFIG[cat] || { color: "#64748b", emoji: "📌" };
+
           return (
             <div key={cat} className="mb-6">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: catColor }}>{cat}</span>
-                <span className="text-[11px] text-slate-600">{catDone}/{items.length}</span>
+              {/* Category header */}
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[16px]">{cfg.emoji}</span>
+                  <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: catComplete ? "#2dffb3" : cfg.color }}>{cat}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] font-semibold" style={{ color: catComplete ? "#2dffb3" : "#64748b" }}>{catDone}/{items.length}</span>
+                  {catComplete && <Check size={14} className="text-emerald-400" />}
+                </div>
               </div>
-              <div className="flex flex-col gap-2">
+
+              {/* Category progress bar (thin) */}
+              <div className="mb-3 h-[3px] w-full overflow-hidden rounded-full bg-white/[0.06]">
+                <div className="h-full rounded-full transition-all duration-500" style={{
+                  width: `${(catDone / items.length) * 100}%`,
+                  background: catComplete ? "#2dffb3" : cfg.color,
+                }} />
+              </div>
+
+              {/* Items */}
+              <div className="flex flex-col gap-1.5">
                 {items.map((item) => {
                   const isChecked = checked.has(item.id);
                   return (
                     <button key={item.id} onClick={() => toggle(item.id)}
-                      className="flex w-full items-center gap-3 rounded-[14px] px-4 py-3.5 text-left transition-all duration-200"
+                      className="group flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left transition-all duration-300 active:scale-[0.98]"
                       style={{
-                        background: isChecked ? "rgba(45,255,179,0.04)" : "rgba(255,255,255,0.02)",
-                        border: isChecked ? "1px solid rgba(45,255,179,0.15)" : "1px solid rgba(255,255,255,0.05)",
+                        background: isChecked ? "rgba(45,255,179,0.05)" : "rgba(255,255,255,0.015)",
+                        border: isChecked ? "1px solid rgba(45,255,179,0.12)" : "1px solid rgba(255,255,255,0.04)",
                       }}>
-                      {/* Checkbox */}
-                      <div className="grid h-6 w-6 shrink-0 place-items-center rounded-lg transition-all duration-200"
+                      {/* Animated checkbox */}
+                      <div className="relative grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md transition-all duration-300"
                         style={{
-                          background: isChecked ? "#2dffb3" : "transparent",
-                          border: isChecked ? "none" : "2px solid rgba(255,255,255,0.15)",
+                          background: isChecked ? cfg.color : "transparent",
+                          border: isChecked ? "none" : "2px solid rgba(255,255,255,0.12)",
+                          transform: isChecked ? "scale(1)" : "scale(1)",
+                          boxShadow: isChecked ? `0 0 12px ${cfg.color}33` : "none",
                         }}>
-                        {isChecked && <Check size={14} className="text-[#04090f]" strokeWidth={3} />}
+                        {isChecked && <Check size={13} className="text-[#04090f]" strokeWidth={3} />}
                       </div>
                       {/* Icon */}
-                      <div className="shrink-0" style={{ color: isChecked ? "#2dffb3" : "#64748b" }}>
-                        {getIcon(item.icon, 15)}
+                      <div className="shrink-0 transition-all duration-300" style={{ color: isChecked ? "#2dffb3" : "#475569", opacity: isChecked ? 0.5 : 0.7 }}>
+                        {getIcon(item.icon, 14)}
                       </div>
                       {/* Label */}
-                      <span className="text-[14px] transition-all duration-200" style={{
-                        color: isChecked ? "rgba(255,255,255,0.4)" : "#e2e8f0",
-                        textDecoration: isChecked ? "line-through" : "none",
+                      <span className="flex-1 text-[13px] leading-snug transition-all duration-300" style={{
+                        color: isChecked ? "rgba(255,255,255,0.35)" : "#cbd5e1",
+                        textDecorationLine: isChecked ? "line-through" : "none",
+                        textDecorationColor: "rgba(255,255,255,0.15)",
                       }}>
                         {item.label}
                       </span>
@@ -200,12 +265,20 @@ export default function ChecklistPage() {
           );
         })}
 
-        {/* Info */}
-        <div className="mt-4 rounded-[16px] border border-cyan-400/10 bg-cyan-400/[0.03] p-4">
-          <p className="text-[12px] leading-relaxed text-slate-500">
-            Este checklist é baseado nas melhores práticas de operação de drones e na regulamentação da ANAC/DECEA.
-            Ele reseta automaticamente a cada novo dia. Sempre verifique todos os itens antes de cada voo.
-          </p>
+        {/* Reset + Info */}
+        <div className="mt-4 flex flex-col gap-4">
+          <button onClick={resetAll}
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] py-3.5 text-[14px] font-medium text-slate-400 transition hover:bg-white/[0.06] hover:text-slate-200">
+            <RotateCcw size={15} />
+            Resetar checklist
+          </button>
+
+          <div className="rounded-[14px] border border-white/[0.04] bg-white/[0.015] p-4">
+            <p className="text-[11px] leading-relaxed text-slate-600">
+              Baseado nas melhores práticas de operação e na regulamentação ANAC/DECEA.
+              O checklist reseta automaticamente a cada novo dia.
+            </p>
+          </div>
         </div>
       </div>
 

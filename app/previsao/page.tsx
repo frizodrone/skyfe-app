@@ -59,7 +59,7 @@ export default function PrevisaoPage() {
       const vis = weather.hourly.visibility?.[i] ?? 24140;
       const cc = weather.hourly.cloud_cover?.[i] ?? 0;
       const hourKp = kpForecast.length > 0 ? getKpForTime(kpForecast, weather.hourly.time[i]) : kpIndex;
-      const res = calculateFlightScore({ wind, gust, rainProb: rainP, temp, kp: hourKp });
+      const res = calculateFlightScore({ wind, gust, rainProb: rainP, temp, kp: hourKp, visibility: vis, cloudCover: cc });
       items.push({ time: weather.hourly.time[i], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: res.score, level: res.level, wind: Math.round(wind), gust: Math.round(gust), rainP: Math.round(rainP), temp: Math.round(temp), kp: parseFloat(hourKp.toFixed(1)), visibility: vis, cloudCover: cc });
     }
     return items;
@@ -104,7 +104,9 @@ export default function PrevisaoPage() {
             const hr = weather.hourly.precipitation_probability?.[h] ?? 0;
             const ht = weather.hourly.temperature_2m?.[h] ?? 20;
             const hkp = kpForecast.length > 0 ? getKpForTime(kpForecast, weather.hourly.time[h]) : ((isToday || isTomorrow) ? kpIndex : 0);
-            const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht, kp: hkp });
+            const hvis = weather.hourly.visibility?.[h] ?? 24140;
+            const hcc = weather.hourly.cloud_cover?.[h] ?? 0;
+            const hres = calculateFlightScore({ wind: hw, gust: hg, rainProb: hr, temp: ht, kp: hkp, visibility: hvis, cloudCover: hcc });
             dayHours.push({ time: weather.hourly.time[h], hour: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), score: hres.score, level: hres.level, wind: Math.round(hw), gust: Math.round(hg), rainP: Math.round(hr), temp: Math.round(ht), kp: parseFloat(hkp.toFixed(1)) });
           }
         }

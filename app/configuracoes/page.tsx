@@ -5,7 +5,6 @@ import {
   ArrowLeft, Wind, Zap, CloudRain, Thermometer, RotateCcw, Save,
 } from "lucide-react";
 import Link from "next/link";
-import AuthGuard from "@/lib/AuthGuard";
 import { supabase } from "@/lib/supabase";
 
 type Config = {

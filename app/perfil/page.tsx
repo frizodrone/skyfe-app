@@ -106,7 +106,27 @@ function Perfil() {
   useEffect(() => {
     const loadFromDB = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
+      if (!user) {
+        // Não logado — carregar dados do localStorage (onboarding)
+        try {
+          const droneRaw = localStorage.getItem("skyfe-drone");
+          const dronesRaw = localStorage.getItem("skyfe-user-drones");
+          const activeDrone = localStorage.getItem("skyfe-active-drone");
+          if (droneRaw) {
+            const drone = JSON.parse(droneRaw);
+            const drones = dronesRaw ? JSON.parse(dronesRaw) : [];
+            const droneName = `${drone.brand} ${drone.name}`;
+            if (!drones.includes(droneName)) drones.unshift(droneName);
+            setProfile(prev => ({
+              ...prev,
+              drone: activeDrone || droneName,
+              drones: drones.length > 0 ? drones : [droneName],
+            }));
+          }
+        } catch {}
+        setLoading(false);
+        return;
+      }
 
       const { data } = await supabase
         .from("profiles")

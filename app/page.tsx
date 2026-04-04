@@ -195,7 +195,7 @@ function WindCompass({ direction, speed, gust }: { direction: number; speed: num
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,_rgba(45,204,255,0.06),_transparent_50%)]" />
       <div className="relative z-10">
         <div className="mb-3 flex items-center gap-2"><Navigation size={16} className="text-cyan-400" /><span className="text-[13px] font-semibold text-slate-300">Bússola do Vento</span></div>
-        <p className="mb-4 text-center text-[12px] text-cyan-400/80">Vento soprando para {windDirectionLabelFull(direction)} — {direction}° {windDirectionLabel(direction)}</p>
+        <p className="mb-4 text-center text-[12px] text-cyan-400/80">Vento vindo de {windDirectionLabelFull(direction)} — {direction}° {windDirectionLabel(direction)}</p>
         <div className="relative mx-auto h-[180px] w-[180px]">
           <svg width="180" height="180" viewBox="0 0 180 180" className="absolute inset-0">
             <circle cx="90" cy="90" r="80" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />

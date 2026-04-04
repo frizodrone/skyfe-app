@@ -244,21 +244,37 @@ function StepDrone({ onNext }: { onNext: (drone: DroneModel) => void }) {
         )}
 
         {/* Next button */}
-        <button
-          disabled={!selected}
-          onClick={() => selected && onNext(selected)}
-          className="fixed bottom-8 left-5 right-5 mx-auto max-w-md flex items-center justify-center gap-2 rounded-full py-4 text-[16px] font-semibold transition disabled:opacity-30"
-          style={selected ? {
-            background: "linear-gradient(135deg, #22d3ee, #34d399)",
-            color: "#04090f",
-            boxShadow: "0 0 30px rgba(45,204,255,0.2)",
-          } : {
-            background: "rgba(255,255,255,0.06)",
-            color: "#64748b",
-          }}>
-          Próximo
-          <ChevronRight size={20} />
-        </button>
+        <div className="fixed bottom-6 left-5 right-5 mx-auto max-w-md flex flex-col gap-2">
+          <button
+            disabled={!selected}
+            onClick={() => selected && onNext(selected)}
+            className="flex w-full items-center justify-center gap-2 rounded-full py-4 text-[16px] font-semibold transition disabled:opacity-30"
+            style={selected ? {
+              background: "linear-gradient(135deg, #22d3ee, #34d399)",
+              color: "#04090f",
+              boxShadow: "0 0 30px rgba(45,204,255,0.2)",
+            } : {
+              background: "rgba(255,255,255,0.06)",
+              color: "#64748b",
+            }}>
+            Próximo
+            <ChevronRight size={20} />
+          </button>
+          {!selected && (
+            <button onClick={() => {
+              // Pular sem drone — usar limites padrão
+              const defaultDrone: DroneModel = {
+                id: "generic", brand: "Genérico", name: "Drone padrão", category: "consumer",
+                maxWind: 30, maxGust: 40, minTemp: 5, maxTemp: 38, maxRain: 50,
+                gnss: ["GPS"], weight: 500, maxFlightTime: 25,
+              };
+              onNext(defaultDrone);
+            }}
+              className="flex w-full items-center justify-center py-3 text-[13px] font-medium text-slate-500 transition hover:text-slate-300">
+              Pular — configurar depois
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="fixed bottom-20 left-1/2 -translate-x-1/2 flex gap-2">
