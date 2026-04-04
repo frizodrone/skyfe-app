@@ -33,6 +33,16 @@ function Configuracoes() {
 
   useEffect(() => {
     const loadFromDB = async () => {
+      // Primeiro, carregar do localStorage (funciona sem login)
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setConfig(parsed);
+        }
+      } catch {}
+
+      // Se logado, sincronizar do Supabase
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
@@ -51,7 +61,6 @@ function Configuracoes() {
           maxTemp: data.max_temp,
         };
         setConfig(c);
-        // Sync to localStorage for score calculation
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); } catch {}
       }
       setLoading(false);
@@ -65,23 +74,24 @@ function Configuracoes() {
   };
 
   const handleSave = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    await supabase
-      .from("user_settings")
-      .update({
-        max_wind: config.maxWind,
-        max_gust: config.maxGust,
-        max_rain: config.maxRain,
-        min_temp: config.minTemp,
-        max_temp: config.maxTemp,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", user.id);
-
-    // Sync to localStorage for score calculation
+    // Sempre salvar no localStorage (funciona sem login)
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)); } catch {}
+
+    // Se logado, salvar no Supabase também
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from("user_settings")
+        .update({
+          max_wind: config.maxWind,
+          max_gust: config.maxGust,
+          max_rain: config.maxRain,
+          min_temp: config.minTemp,
+          max_temp: config.maxTemp,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
+    }
 
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -324,5 +334,5 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
 }
 
 export default function ConfiguracoesWrapper() {
-  return <AuthGuard><Configuracoes /></AuthGuard>;
+  return <Configuracoes />;
 }

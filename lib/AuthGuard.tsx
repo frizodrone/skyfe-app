@@ -99,7 +99,31 @@ export function LoginPromptModal({ onClose, feature }: { onClose: () => void; fe
   );
 }
 
-// AuthGuard — agora apenas renderiza children, nunca bloqueia
+// AuthGuard — redireciona ao onboarding no primeiro uso
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Verificar se onboarding foi concluído
+    try {
+      const done = localStorage.getItem("skyfe-onboarding-done") === "true";
+      if (!done && typeof window !== "undefined" && window.location.pathname !== "/onboarding") {
+        window.location.href = "/onboarding";
+        return;
+      }
+    } catch {}
+    setReady(true);
+  }, []);
+
+  if (!ready) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#04090f]">
+        <div className="h-[3px] w-48 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="h-full w-full animate-loading-bar rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" />
+        </div>
+      </main>
+    );
+  }
+
   return <>{children}</>;
 }

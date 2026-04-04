@@ -43,6 +43,7 @@ export default function LoginPage() {
           password,
           options: {
             data: { name: name || email.split("@")[0] },
+            emailRedirectTo: `${window.location.origin}/`,
           },
         });
         if (err) throw err;

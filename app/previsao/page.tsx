@@ -179,7 +179,7 @@ export default function PrevisaoPage() {
         )}
 
         {/* Tabs */}
-        <div className="mb-8 flex gap-3">
+        <div className="mb-4 flex gap-3">
           {(["hours", "days"] as const).map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className="flex-1 rounded-2xl py-3.5 text-[15px] font-semibold transition-all duration-200"
@@ -187,6 +187,21 @@ export default function PrevisaoPage() {
             >{tab === "hours" ? "Próximas 24h" : "16 dias"}</button>
           ))}
         </div>
+
+        {/* Day shortcut cards — próximos 6 dias */}
+        {dailyItems.length > 0 && (
+          <div className="mb-4 no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
+            {dailyItems.slice(0, 6).map((day) => (
+              <button key={day.date} onClick={() => { setActiveTab("days"); setExpandedDay(day.date); }}
+                className="flex shrink-0 flex-col items-center gap-1 rounded-[14px] px-3.5 py-2.5 transition-all duration-200"
+                style={{ background: `${LC[day.level]}08`, border: `1px solid ${LC[day.level]}1a`, minWidth: "64px" }}>
+                <span className="text-[11px] font-semibold text-slate-400">{day.dayLabel.split(",")[0]}</span>
+                <span className="text-[16px] font-bold" style={{ color: LC[day.level] }}>{day.avgScore}</span>
+                <span className="h-[6px] w-[6px] rounded-full" style={{ background: LC[day.level] }} />
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="mb-8 flex items-center gap-4 text-[12px]">
           <span className="flex items-center gap-1.5 text-slate-500"><span className="h-[9px] w-[9px] rounded-full bg-[#2dffb3]" /> Seguro</span>

@@ -49,7 +49,7 @@ type AirspaceZone = {
   radius_km: number;
 };
 
-type MapStyle = "dark" | "satellite";
+type MapStyle = "dark" | "satellite" | "streets";
 
 /* ═══════════════════════════════════════════════════════════
    CONSTANTS
@@ -57,11 +57,13 @@ type MapStyle = "dark" | "satellite";
 const TILE_URLS: Record<MapStyle, string> = {
   dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
   satellite: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  streets: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
 };
 
 const TILE_ATTR: Record<MapStyle, string> = {
   dark: '&copy; <a href="https://carto.com/">CARTO</a>',
   satellite: '&copy; <a href="https://www.esri.com/">Esri</a>',
+  streets: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 };
 
 const AIRPORT_COLORS: Record<string, string> = {
@@ -81,8 +83,10 @@ const AIRPORT_LABELS: Record<string, string> = {
 };
 
 const AIRSPACE_BORDERS: Record<string, string> = {
-  CTR: "#ff5a5f",
-  TMA: "#ffd84d",
+  AERODROME: "#ff2d2d",
+  ZAD: "#ff5a5f",
+  CTR: "#ffd84d",
+  HELIPORT: "#c084fc",
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -225,18 +229,48 @@ function generateAirspaces(airports: Airport[]): AirspaceZone[] {
   const zones: AirspaceZone[] = [];
   for (const ap of airports) {
     if (ap.type === "large_airport") {
+      // ZAD — Zona de Aproximação e Decolagem: 9 km da cabeceira (ICA 100-40)
+      zones.push({
+        id: `zad-${ap.id}`, name: `ZAD ${ap.icao}`, type: "ZAD",
+        lowerLimit: 0, upperLimit: 14500, center: [ap.lat, ap.lon], radius_km: 9,
+      });
+      // Área patrimonial + buffer: 2 km fora da ZAD (ICA 100-40)
+      zones.push({
+        id: `aero-${ap.id}`, name: `Área aeródromo ${ap.icao}`, type: "AERODROME",
+        lowerLimit: 0, upperLimit: 3500, center: [ap.lat, ap.lon], radius_km: 2,
+      });
+      // CTR (se existir) — raio variável, usando 18 km como aproximação para grandes
       zones.push({
         id: `ctr-${ap.id}`, name: `CTR ${ap.icao}`, type: "CTR",
-        lowerLimit: 0, upperLimit: 3500, center: [ap.lat, ap.lon], radius_km: 10,
-      });
-      zones.push({
-        id: `tma-${ap.id}`, name: `TMA ${ap.icao}`, type: "TMA",
-        lowerLimit: 0, upperLimit: 14500, center: [ap.lat, ap.lon], radius_km: 25,
+        lowerLimit: 0, upperLimit: 14500, center: [ap.lat, ap.lon], radius_km: 18,
       });
     } else if (ap.type === "medium_airport") {
+      // ZAD: 9 km
       zones.push({
-        id: `ctr-${ap.id}`, name: `CTR ${ap.icao}`, type: "CTR",
-        lowerLimit: 0, upperLimit: 2500, center: [ap.lat, ap.lon], radius_km: 5,
+        id: `zad-${ap.id}`, name: `ZAD ${ap.icao}`, type: "ZAD",
+        lowerLimit: 0, upperLimit: 3500, center: [ap.lat, ap.lon], radius_km: 9,
+      });
+      // Área patrimonial: 2 km
+      zones.push({
+        id: `aero-${ap.id}`, name: `Área aeródromo ${ap.icao}`, type: "AERODROME",
+        lowerLimit: 0, upperLimit: 2500, center: [ap.lat, ap.lon], radius_km: 2,
+      });
+    } else if (ap.type === "small_airport") {
+      // ZAD: 9 km (mesma regra)
+      zones.push({
+        id: `zad-${ap.id}`, name: `ZAD ${ap.icao}`, type: "ZAD",
+        lowerLimit: 0, upperLimit: 1500, center: [ap.lat, ap.lon], radius_km: 9,
+      });
+      // Área patrimonial: 2 km
+      zones.push({
+        id: `aero-${ap.id}`, name: `Área aeródromo ${ap.icao}`, type: "AERODROME",
+        lowerLimit: 0, upperLimit: 1500, center: [ap.lat, ap.lon], radius_km: 2,
+      });
+    } else if (ap.type === "heliport") {
+      // Heliponto: 2 km se altura < 60m (ICA 100-40)
+      zones.push({
+        id: `heli-${ap.id}`, name: `Zona ${ap.name}`, type: "HELIPORT",
+        lowerLimit: 0, upperLimit: 1000, center: [ap.lat, ap.lon], radius_km: 2,
       });
     }
   }
@@ -435,22 +469,24 @@ function Legend({ show, onToggle }: { show: boolean; onToggle: () => void }) {
             ))}
           </div>
 
-          <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Espaço aéreo</p>
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Espaço aéreo (ICA 100-40)</p>
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center gap-2.5 text-[12px] text-slate-300">
-              <span className="h-4 w-4 rounded-full shrink-0 border-2" style={{ borderColor: "#ff5a5f", background: "rgba(255,90,95,0.15)" }} />
+              <span className="h-4 w-4 rounded-full shrink-0 border-2" style={{ borderColor: "#ff2d2d", background: "rgba(255,45,45,0.2)" }} />
+              Área patrimonial — 2 km
+            </div>
+            <div className="flex items-center gap-2.5 text-[12px] text-slate-300">
+              <span className="h-4 w-4 rounded-full shrink-0 border-2 border-dashed" style={{ borderColor: "#ff5a5f", background: "rgba(255,90,95,0.08)" }} />
+              ZAD — 9 km da cabeceira
+            </div>
+            <div className="flex items-center gap-2.5 text-[12px] text-slate-300">
+              <span className="h-4 w-4 rounded-full shrink-0 border-2 border-dashed" style={{ borderColor: "#ffd84d", background: "rgba(255,216,77,0.06)" }} />
               CTR — Zona de controle
             </div>
             <div className="flex items-center gap-2.5 text-[12px] text-slate-300">
-              <span className="h-4 w-4 rounded-full shrink-0 border-2 border-dashed" style={{ borderColor: "#ffd84d", background: "rgba(255,216,77,0.1)" }} />
-              TMA — Área terminal
+              <span className="h-4 w-4 rounded-full shrink-0 border-2" style={{ borderColor: "#c084fc", background: "rgba(192,132,252,0.1)" }} />
+              Heliponto — 2 km
             </div>
-          </div>
-
-          <div className="mt-4 rounded-xl bg-red-500/[0.08] border border-red-500/20 px-3 py-2.5">
-            <p className="text-[11px] leading-relaxed text-red-300/80">
-              ⚠️ Zonas CTR e TMA exigem autorização DECEA/SARPAS para voo com drones.
-            </p>
           </div>
         </div>
       )}
@@ -632,20 +668,32 @@ function ZonasMap() {
     layerGroupRef.current.clearLayers();
     heliLayerRef.current.clearLayers();
 
-    // Draw airspaces
-    for (const zone of airspaces) {
+    // Draw airspaces (outer zones first, inner on top)
+    const sortedZones = [...airspaces].sort((a, b) => b.radius_km - a.radius_km);
+    for (const zone of sortedZones) {
+      const zoneColor = AIRSPACE_BORDERS[zone.type] || "#ff5a5f";
+      const isAerodrome = zone.type === "AERODROME";
+      const isZAD = zone.type === "ZAD";
+      const isCTR = zone.type === "CTR";
+      const isHeliport = zone.type === "HELIPORT";
+
       const circle = L.circle(zone.center, {
         radius: zone.radius_km * 1000,
-        color: AIRSPACE_BORDERS[zone.type] || "#ff5a5f",
-        weight: zone.type === "TMA" ? 1.5 : 2,
-        opacity: 0.6,
-        fillColor: AIRSPACE_BORDERS[zone.type] || "#ff5a5f",
-        fillOpacity: zone.type === "TMA" ? 0.06 : 0.1,
-        dashArray: zone.type === "TMA" ? "10,8" : undefined,
+        color: zoneColor,
+        weight: isAerodrome ? 2.5 : isZAD ? 2 : 1.5,
+        opacity: isAerodrome ? 0.8 : isZAD ? 0.5 : 0.4,
+        fillColor: zoneColor,
+        fillOpacity: isAerodrome ? 0.15 : isZAD ? 0.06 : isCTR ? 0.04 : 0.08,
+        dashArray: isCTR ? "12,8" : isZAD ? "10,6" : undefined,
       });
 
+      const zoneDesc = isAerodrome ? `Área patrimonial — 2 km (ICA 100-40)`
+        : isZAD ? `ZAD — 9 km da cabeceira (ICA 100-40)`
+        : isCTR ? `CTR — Zona de controle`
+        : `Heliponto — 2 km (ICA 100-40)`;
+
       circle.bindTooltip(
-        `<div style="font-size:11px;font-weight:600;">${zone.name}</div><div style="font-size:10px;color:#999;">${zone.type} • ${zone.lowerLimit}–${zone.upperLimit} ft</div>`,
+        `<div style="font-size:11px;font-weight:600;">${zone.name}</div><div style="font-size:10px;color:#999;">${zone.type} • ${zone.radius_km} km • ${zone.lowerLimit}–${zone.upperLimit} ft</div><div style="font-size:9px;color:#aaa;margin-top:3px;">${zoneDesc}</div>`,
         { direction: "top" }
       );
 
@@ -678,19 +726,60 @@ function ZonasMap() {
         layerGroupRef.current.addLayer(marker);
       }
 
-      // Draw runways
+      // Draw runways as styled rectangles with threshold marks
       for (const rw of ap.runways) {
         if (rw.le_lat && rw.le_lon && rw.he_lat && rw.he_lon) {
-          const line = L.polyline(
-            [[rw.le_lat, rw.le_lon], [rw.he_lat, rw.he_lon]],
-            { color: "#ffffff", weight: 3, opacity: 0.65 }
-          );
-          layerGroupRef.current.addLayer(line);
+          // Calculate runway rectangle using heading and width
+          const widthM = Math.max(rw.width_m || 30, 20);
+          const halfWidthDeg = (widthM / 2) / 111320; // approx degrees
+          const headingRad = ((rw.le_heading || 0) * Math.PI) / 180;
+          const perpRad = headingRad + Math.PI / 2;
 
-          const mkThreshold = (ident: string, lat: number, lon: number) => {
+          // Offset points perpendicular to runway axis
+          const dx = halfWidthDeg * Math.sin(perpRad) * 2.5; // exaggerate for visibility
+          const dy = halfWidthDeg * Math.cos(perpRad) * 2.5;
+
+          const corners = [
+            [rw.le_lat + dy, rw.le_lon + dx],
+            [rw.le_lat - dy, rw.le_lon - dx],
+            [rw.he_lat - dy, rw.he_lon - dx],
+            [rw.he_lat + dy, rw.he_lon + dx],
+          ];
+
+          // Runway surface (dark gray rectangle)
+          const rwPoly = L.polygon(corners as any, {
+            color: "#ffffff",
+            weight: 1.5,
+            opacity: 0.5,
+            fillColor: "#333333",
+            fillOpacity: 0.7,
+          });
+          layerGroupRef.current.addLayer(rwPoly);
+
+          // Center line (dashed white)
+          const centerLine = L.polyline(
+            [[rw.le_lat, rw.le_lon], [rw.he_lat, rw.he_lon]],
+            { color: "#ffffff", weight: 1.5, opacity: 0.6, dashArray: "8,6" }
+          );
+          layerGroupRef.current.addLayer(centerLine);
+
+          // Threshold marks (short perpendicular lines at each end)
+          const thresholdLen = halfWidthDeg * 2;
+          const mkThresholdLine = (lat: number, lon: number) => {
+            const tLine = L.polyline(
+              [[lat + dy * 0.8, lon + dx * 0.8], [lat - dy * 0.8, lon - dx * 0.8]],
+              { color: "#ffffff", weight: 3, opacity: 0.8 }
+            );
+            layerGroupRef.current.addLayer(tLine);
+          };
+          mkThresholdLine(rw.le_lat, rw.le_lon);
+          mkThresholdLine(rw.he_lat, rw.he_lon);
+
+          // Threshold labels
+          const mkThresholdLabel = (ident: string, lat: number, lon: number) => {
             if (!lat || !lon) return;
             const ic = L.divIcon({
-              html: `<div style="font-size:9px;font-weight:700;color:#fff;background:rgba(0,0,0,0.75);padding:1px 5px;border-radius:4px;white-space:nowrap;border:1px solid rgba(255,255,255,0.2);">${ident}</div>`,
+              html: `<div style="font-size:10px;font-weight:800;color:#fff;background:rgba(0,0,0,0.82);padding:2px 6px;border-radius:5px;white-space:nowrap;border:1px solid rgba(255,255,255,0.25);letter-spacing:0.5px;">${ident}</div>`,
               className: "",
               iconAnchor: [14, 14],
             });
@@ -698,8 +787,8 @@ function ZonasMap() {
             layerGroupRef.current.addLayer(m);
           };
 
-          mkThreshold(rw.le_ident, rw.le_lat, rw.le_lon);
-          mkThreshold(rw.he_ident, rw.he_lat, rw.he_lon);
+          mkThresholdLabel(rw.le_ident, rw.le_lat, rw.le_lon);
+          mkThresholdLabel(rw.he_ident, rw.he_lat, rw.he_lon);
         }
       }
     }
@@ -842,9 +931,9 @@ function ZonasMap() {
 
       {/* Controls */}
       <div className="absolute right-3 bottom-24 z-[1000] flex flex-col gap-2">
-        <button onClick={() => setMapStyle(mapStyle === "dark" ? "satellite" : "dark")}
+        <button onClick={() => setMapStyle(mapStyle === "dark" ? "satellite" : mapStyle === "satellite" ? "streets" : "dark")}
           className="grid h-11 w-11 place-items-center rounded-2xl border border-white/[0.1] bg-[#0a1222]/90 text-slate-300 shadow-lg backdrop-blur-xl transition hover:bg-[#0a1222]"
-          title={mapStyle === "dark" ? "Satélite" : "Escuro"}>
+          title={mapStyle === "dark" ? "Satélite" : mapStyle === "satellite" ? "Ruas" : "Escuro"}>
           <Layers size={17} />
         </button>
         <button onClick={handleLocate}

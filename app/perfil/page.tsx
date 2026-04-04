@@ -3,25 +3,42 @@
 import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Sun, Map, Clock3, User, Settings, Shield, Globe, Info,
-  Edit3, Save, ChevronDown, Star, Trash2, MapPin,
+  Edit3, Save, ChevronDown, Star, Trash2, MapPin, X,
 } from "lucide-react";
 import Link from "next/link";
 import AuthGuard, { useIsLoggedIn, LoginPromptModal } from "@/lib/AuthGuard";
 import { supabase } from "@/lib/supabase";
 
-type Profile = { name: string; drone: string; experience: string };
+import { DRONE_DATABASE } from "@/lib/drones";
 
-const DRONE_CATEGORIES = [
-  { category: "DJI Mini", items: ["DJI Mini 2","DJI Mini 2 SE","DJI Mini 3","DJI Mini 3 Pro","DJI Mini 4 Pro","DJI Mini 4K","DJI Mini 5 Pro"] },
-  { category: "DJI Air", items: ["DJI Air 2","DJI Air 2S","DJI Air 3","DJI Air 3S"] },
-  { category: "DJI Mavic", items: ["DJI Mavic Pro","DJI Mavic 3","DJI Mavic 3 Classic","DJI Mavic 3 Pro","DJI Mavic 3 Cine","DJI Mavic 4 Pro"] },
-  { category: "DJI FPV", items: ["DJI Avata","DJI Avata 2","DJI Avata 360","DJI FPV","DJI Neo","DJI Neo 2"] },
-  { category: "DJI Clássicos", items: ["DJI Phantom 4 Pro","DJI Spark"] },
-  { category: "DJI Enterprise", items: ["DJI Matrice 30","DJI Matrice 30T","DJI Matrice 300 RTK","DJI Matrice 350 RTK","DJI Mavic 3 Enterprise","DJI Mavic 3 Thermal","DJI Mavic 3 Multispectral","DJI Dock","DJI Dock 2"] },
-  { category: "DJI Agrícola", items: ["DJI Agras T10","DJI Agras T16","DJI Agras T20","DJI Agras T25","DJI Agras T30","DJI Agras T40","DJI Agras T50"] },
-  { category: "Autel", items: ["Autel EVO Nano","Autel EVO Nano+","Autel EVO Lite","Autel EVO Lite+","Autel EVO II","Autel EVO II Pro","Autel EVO II Dual","Autel EVO Max 4T"] },
-  { category: "FPV / Outros", items: ["FPV Customizado","Outro"] },
-];
+type Profile = { name: string; drone: string; drones: string[]; experience: string };
+
+// Generate DRONE_CATEGORIES dynamically from the database
+const DRONE_CATEGORIES = (() => {
+  const groups: Record<string, string[]> = {};
+  const brandOrder = ["DJI", "Autel", "Skydio", "Parrot", "FIMI", "Hubsan", "Potensic", "Antigravity", "ZeroZero", "Ryze", "FPV Genérico"];
+
+  for (const drone of DRONE_DATABASE) {
+    // Group DJI by sub-category
+    let cat = drone.brand;
+    if (drone.brand === "DJI") {
+      if (drone.name.includes("Mini") || drone.name === "Flip" || drone.name.includes("Neo")) cat = "DJI Mini / Neo / Flip";
+      else if (drone.name.includes("Air")) cat = "DJI Air";
+      else if (drone.name.includes("Mavic")) cat = "DJI Mavic";
+      else if (drone.name.includes("Avata") || drone.name === "FPV") cat = "DJI FPV / Avata";
+      else if (drone.name.includes("Phantom") || drone.name === "Spark") cat = "DJI Clássicos";
+      else if (drone.name.includes("Inspire")) cat = "DJI Inspire";
+      else if (drone.name.includes("Matrice") || drone.name.includes("FlyCart")) cat = "DJI Enterprise";
+      else if (drone.name.includes("Agras")) cat = "DJI Agrícola";
+      else if (drone.name.includes("Enterprise") || drone.name.includes("Thermal") || drone.name.includes("Multispectral")) cat = "DJI Enterprise";
+      else cat = "DJI Outros";
+    }
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(`${drone.brand} ${drone.name}`);
+  }
+
+  return Object.entries(groups).map(([category, items]) => ({ category, items }));
+})();
 
 const EXP_OPTIONS = [
   { value: "beginner", label: "Iniciante", color: "#94a3b8" },
@@ -31,7 +48,7 @@ const EXP_OPTIONS = [
   { value: "expert", label: "Especialista", color: "#c084fc" },
 ];
 
-const DEFAULTS: Profile = { name: "", drone: "", experience: "" };
+const DEFAULTS: Profile = { name: "", drone: "", drones: [], experience: "" };
 
 function getInitials(name: string): string {
   const p = name.trim().split(/\s+/).filter(Boolean);
@@ -125,17 +142,23 @@ function Perfil() {
   const update = (key: keyof Profile, value: string) => setProfile((prev) => ({ ...prev, [key]: value }));
 
   const handleSave = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    // Save drones list to localStorage (works without login)
+    try {
+      localStorage.setItem("skyfe-user-drones", JSON.stringify(profile.drones));
+      localStorage.setItem("skyfe-active-drone", profile.drone);
+    } catch {}
 
-    await supabase
-      .from("profiles")
-      .update({
-        name: profile.name,
-        drone_model: profile.drone,
-        experience_level: profile.experience,
-      })
-      .eq("id", user.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from("profiles")
+        .update({
+          name: profile.name,
+          drone_model: profile.drone,
+          experience_level: profile.experience,
+        })
+        .eq("id", user.id);
+    }
 
     setEditing(false);
     setSaved(true);
@@ -189,9 +212,14 @@ function Perfil() {
             {/* name */}
             <h2 className="mb-2 text-center text-[26px] font-bold text-white">{profile.name}</h2>
 
-            {/* drone */}
+            {/* drones */}
             {profile.drone && (
-              <p className="mb-3 text-center text-[15px] text-slate-400">{profile.drone}</p>
+              <div className="mb-3 text-center">
+                <p className="text-[15px] text-slate-400">{profile.drone}</p>
+                {profile.drones.length > 1 && (
+                  <p className="text-[11px] text-slate-600 mt-0.5">+{profile.drones.length - 1} {profile.drones.length === 2 ? "outro drone" : "outros drones"}</p>
+                )}
+              </div>
             )}
 
             {/* experience badge */}
@@ -232,12 +260,35 @@ function Perfil() {
               />
             </div>
 
-            {/* Drone dropdown */}
+            {/* Drones — multiple selection */}
             <div className="mb-6">
+              <p className="mb-2 text-[13px] font-medium text-slate-400">Meus drones</p>
+
+              {/* Currently selected drones */}
+              {profile.drones.length > 0 && (
+                <div className="mb-3 flex flex-col gap-2">
+                  {profile.drones.map((d, i) => (
+                    <div key={d} className="flex items-center gap-2 rounded-[14px] px-4 py-3"
+                      style={d === profile.drone ? { background: "rgba(45,204,255,0.08)", border: "1px solid rgba(45,204,255,0.25)" } : { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <button onClick={() => update("drone", d)} className="flex-1 text-left text-[14px] font-medium" style={{ color: d === profile.drone ? "#2dccff" : "#e2e8f0" }}>
+                        {d}
+                        {d === profile.drone && <span className="ml-2 text-[10px] uppercase tracking-wider text-cyan-400/60">ativo</span>}
+                      </button>
+                      <button onClick={() => {
+                        const newDrones = profile.drones.filter(dr => dr !== d);
+                        setProfile(prev => ({ ...prev, drones: newDrones, drone: prev.drone === d ? (newDrones[0] || "") : prev.drone }));
+                        setSaved(false);
+                      }} className="text-slate-600 transition hover:text-red-400"><X size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add drone dropdown */}
               <Dropdown
-                label="Modelo do drone"
-                value={profile.drone}
-                placeholder="Selecione seu drone"
+                label="Adicionar drone"
+                value=""
+                placeholder="+ Adicionar outro drone"
                 open={droneOpen}
                 onToggle={() => { setDroneOpen(!droneOpen); setExpOpen(false); }}
               >
@@ -246,14 +297,25 @@ function Perfil() {
                     <p className="sticky top-0 bg-[#0b1424] px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-cyan-400/70 border-b border-white/[0.04]">
                       {cat.category}
                     </p>
-                    {cat.items.map((item) => (
-                      <button key={item}
-                        onClick={() => { update("drone", item); setDroneOpen(false); }}
-                        className="flex w-full items-center px-5 py-3.5 text-[15px] text-left transition hover:bg-white/[0.04]"
-                        style={profile.drone === item ? { color: "#2dccff", background: "rgba(45,204,255,0.08)" } : { color: "#e2e8f0" }}>
-                        {item}
-                      </button>
-                    ))}
+                    {cat.items.map((item) => {
+                      const alreadyAdded = profile.drones.includes(item);
+                      return (
+                        <button key={item}
+                          onClick={() => {
+                            if (!alreadyAdded) {
+                              const newDrones = [...profile.drones, item];
+                              setProfile(prev => ({ ...prev, drones: newDrones, drone: prev.drone || item }));
+                              setSaved(false);
+                            }
+                            setDroneOpen(false);
+                          }}
+                          disabled={alreadyAdded}
+                          className="flex w-full items-center px-5 py-3.5 text-[15px] text-left transition hover:bg-white/[0.04] disabled:opacity-30"
+                          style={alreadyAdded ? { color: "#64748b" } : { color: "#e2e8f0" }}>
+                          {item} {alreadyAdded && <span className="ml-auto text-[10px] text-slate-600">adicionado</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 ))}
               </Dropdown>
@@ -382,17 +444,19 @@ function Perfil() {
                 </div>
                 <div>
                   <h2 className="text-[20px] font-bold">Sky<span className="text-cyan-400">Fe</span></h2>
-                  <p className="text-[13px] text-slate-500">Versão 2.5.0</p>
+                  <p className="text-[13px] text-slate-500">Versão 2.5.3</p>
                 </div>
               </div>
-              <p className="mb-4 text-[14px] leading-relaxed text-slate-400">
-                Sistema de decisão de voo para pilotos de drones. Analisa condições climáticas em tempo real e calcula um score de 0 a 100.
-              </p>
-              <div className="flex flex-col gap-2.5 text-[13px] text-slate-500">
-                <div className="flex items-center gap-2.5"><Globe size={14} className="text-slate-600" /><span>Dados: Open-Meteo</span></div>
-                <div className="flex items-center gap-2.5"><Map size={14} className="text-slate-600" /><span>Mapas: OpenStreetMap</span></div>
+              <div className="mt-1 rounded-[16px] border border-cyan-400/10 bg-cyan-400/[0.03] p-4 mb-4">
+                <p className="text-[13px] leading-relaxed text-slate-400">
+                  O SkyFe cruza dados meteorológicos de múltiplas fontes internacionais com algoritmos proprietários para transformar informações complexas em uma resposta simples e visual. Combinamos previsões atmosféricas em tempo real, monitoramento geomagnético via satélites da NOAA, mapeamento de espaço aéreo com dados oficiais e inteligência de altitude de vento — tudo processado instantaneamente para oferecer a pilotos de drone a melhor tomada de decisão antes de cada voo.
+                </p>
               </div>
-              <p className="mt-5 text-[12px] text-slate-600">Desenvolvido por Frizodrone © 2025-2026</p>
+              <div className="flex flex-col gap-2.5 text-[13px] text-slate-500">
+                <div className="flex items-center gap-2.5"><Globe size={14} className="text-slate-600" /><span>Dados: Open-Meteo & NOAA</span></div>
+                <div className="flex items-center gap-2.5"><Map size={14} className="text-slate-600" /><span>Mapas: OpenStreetMap & OurAirports</span></div>
+              </div>
+              <p className="mt-5 text-[12px] text-slate-600">Desenvolvido por SkyFe Tecnologia © 2025–2026</p>
             </div>
           )}
         </section>
