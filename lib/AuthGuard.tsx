@@ -99,20 +99,38 @@ export function LoginPromptModal({ onClose, feature }: { onClose: () => void; fe
   );
 }
 
-// AuthGuard — redireciona ao onboarding no primeiro uso
+// AuthGuard — login obrigatório + onboarding no primeiro uso
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Verificar se onboarding foi concluído
-    try {
-      const done = localStorage.getItem("skyfe-onboarding-done") === "true";
-      if (!done && typeof window !== "undefined" && window.location.pathname !== "/onboarding") {
-        window.location.href = "/onboarding";
+    const check = async () => {
+      // Páginas que não exigem login
+      const path = window.location.pathname;
+      if (path === "/login" || path === "/auth/callback" || path === "/privacidade" || path === "/termos") {
+        setReady(true);
         return;
       }
-    } catch {}
-    setReady(true);
+
+      // Verificar se está logado
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = "/login";
+        return;
+      }
+
+      // Verificar se onboarding foi concluído
+      try {
+        const done = localStorage.getItem("skyfe-onboarding-done") === "true";
+        if (!done && path !== "/onboarding") {
+          window.location.href = "/onboarding";
+          return;
+        }
+      } catch {}
+
+      setReady(true);
+    };
+    check();
   }, []);
 
   if (!ready) {

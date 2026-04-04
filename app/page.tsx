@@ -250,69 +250,155 @@ async function generateShareImage(
   wind: number, gust: number, rainP: number, temp: number, kp: number,
   sunTimes: { sunrise: string; sunset: string } | null
 ) {
+  const S = 1080; // 1080x1080
   const canvas = document.createElement("canvas");
-  canvas.width = 1080; canvas.height = 1080;
+  canvas.width = S; canvas.height = S;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
   const color = LC[level];
   const now = new Date();
-  const dateStr = now.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const dateStr = now.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-  const bg = ctx.createRadialGradient(540, 400, 0, 540, 540, 700);
-  bg.addColorStop(0, "#0a1628"); bg.addColorStop(1, "#04090f");
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, 1080, 1080);
+  // Helper: rounded rect fill
+  const roundRect = (x: number, y: number, w: number, h: number, r: number, fill: string, stroke?: string) => {
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+  };
 
-  const glow = ctx.createRadialGradient(540, 350, 0, 540, 350, 400);
-  glow.addColorStop(0, `${color}12`); glow.addColorStop(1, "transparent");
-  ctx.fillStyle = glow; ctx.fillRect(0, 0, 1080, 1080);
+  // ─── Background ───
+  ctx.fillStyle = "#04090f"; ctx.fillRect(0, 0, S, S);
 
-  ctx.font = "bold 42px -apple-system, BlinkMacSystemFont, sans-serif";
-  ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
-  ctx.fillText("Sky", 510, 80);
-  ctx.fillStyle = "#22d3ee"; ctx.fillText("Fe", 568, 80);
+  // Subtle radial glow behind score
+  const g1 = ctx.createRadialGradient(S/2, 420, 0, S/2, 420, 350);
+  g1.addColorStop(0, `${color}18`); g1.addColorStop(1, "transparent");
+  ctx.fillStyle = g1; ctx.fillRect(0, 0, S, S);
 
-  ctx.font = "500 24px -apple-system, BlinkMacSystemFont, sans-serif";
-  ctx.fillStyle = "#94a3b8"; ctx.textAlign = "center";
-  ctx.fillText(location.length > 45 ? location.substring(0, 42) + "..." : location, 540, 130);
+  // Top bar gradient line
+  const topG = ctx.createLinearGradient(100, 0, S-100, 0);
+  topG.addColorStop(0, "transparent"); topG.addColorStop(0.5, `${color}40`); topG.addColorStop(1, "transparent");
+  ctx.fillStyle = topG; ctx.fillRect(0, 40, S, 2);
 
-  ctx.font = "400 20px -apple-system, BlinkMacSystemFont, sans-serif";
+  // ─── Header: Logo + Location + Date ───
+  ctx.textAlign = "center";
+  ctx.font = "800 38px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.fillStyle = "#fff"; ctx.fillText("Sky", S/2 - 28, 100);
+  ctx.fillStyle = "#22d3ee"; ctx.fillText("Fe", S/2 + 28, 100);
+
+  ctx.font = "600 22px -apple-system, sans-serif";
+  ctx.fillStyle = "#94a3b8";
+  const loc = location.length > 40 ? location.substring(0, 37) + "..." : location;
+  ctx.fillText(loc, S/2, 145);
+
+  ctx.font = "400 18px -apple-system, sans-serif";
   ctx.fillStyle = "#475569";
-  ctx.fillText(`${dateStr} · ${timeStr}`, 540, 165);
+  ctx.fillText(`${dateStr} · ${timeStr}`, S/2, 178);
 
-  ctx.beginPath(); ctx.arc(540, 380, 160, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 12; ctx.stroke();
-  ctx.beginPath(); ctx.arc(540, 380, 160, -Math.PI / 2, -Math.PI / 2 + (score / 100) * Math.PI * 2);
-  ctx.strokeStyle = color; ctx.lineWidth = 12; ctx.lineCap = "round"; ctx.stroke();
+  // ─── Score Ring (large, centered) ───
+  const cx = S/2, cy = 400, r = 140;
+  // Track
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 14; ctx.stroke();
+  // Score arc
+  ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + (score/100) * Math.PI * 2);
+  ctx.strokeStyle = color; ctx.lineWidth = 14; ctx.lineCap = "round"; ctx.stroke();
+  // Inner glow
+  ctx.shadowColor = color; ctx.shadowBlur = 30;
+  ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + (score/100) * Math.PI * 2);
+  ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.stroke();
+  ctx.shadowBlur = 0;
 
-  ctx.font = "bold 120px -apple-system, BlinkMacSystemFont, sans-serif";
-  ctx.fillStyle = color; ctx.textAlign = "center"; ctx.fillText(`${score}`, 540, 410);
-  ctx.font = "400 28px -apple-system, sans-serif"; ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.fillText("/100", 540, 450);
+  // Score number
+  ctx.font = "800 110px -apple-system, sans-serif";
+  ctx.fillStyle = "#fff"; ctx.textAlign = "center";
+  ctx.fillText(`${score}`, cx, cy + 15);
+  ctx.font = "500 26px -apple-system, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fillText("/100", cx, cy + 50);
 
-  ctx.font = "bold 32px -apple-system, sans-serif";
-  ctx.fillStyle = color; ctx.fillText(label.toUpperCase(), 540, 600);
+  // ─── Status badge ───
+  roundRect(S/2 - 120, 575, 240, 40, 20, `${color}15`, `${color}30`);
+  ctx.font = "700 14px -apple-system, sans-serif";
+  ctx.fillStyle = color; ctx.textAlign = "center";
+  ctx.fillText(label.toUpperCase(), S/2, 601);
 
-  const msg = level === "good" ? "Condições ideais para voo de drone" : level === "warn" ? "Voo possível com atenção requerida" : "Condições adversas — voo não recomendado";
-  ctx.font = "400 22px -apple-system, sans-serif"; ctx.fillStyle = "#94a3b8"; ctx.fillText(msg, 540, 645);
+  // ─── Metrics Grid (2 rows x 3 cols) ───
+  const metrics = [
+    { label: "VENTO", value: `${wind}`, unit: "km/h" },
+    { label: "RAJADA", value: `${gust}`, unit: "km/h" },
+    { label: "CHUVA", value: `${rainP}`, unit: "%" },
+    { label: "TEMP", value: `${temp}`, unit: "°C" },
+    { label: "KP", value: `${kp.toFixed(1)}`, unit: "" },
+    { label: sunTimes ? "NASCER" : "VISIB.", value: sunTimes ? sunTimes.sunrise : "—", unit: "" },
+  ];
 
-  const metrics = [{ l: "Vento", v: `${wind} km/h`, i: "💨" }, { l: "Rajada", v: `${gust} km/h`, i: "⚡" }, { l: "Chuva", v: `${rainP}%`, i: "🌧" }, { l: "Temp", v: `${temp}°C`, i: "🌡" }, { l: "Kp", v: `${kp.toFixed(1)}`, i: "📡" }];
-  const cW = 170, cH = 90, gap = 18;
-  const totalW = metrics.length * cW + (metrics.length - 1) * gap;
-  let sX = (1080 - totalW) / 2;
+  const gCols = 3, gRows = 2;
+  const cardW = 300, cardH = 100, gGap = 16;
+  const gridW = gCols * cardW + (gCols - 1) * gGap;
+  const gridStartX = (S - gridW) / 2;
+  const gridStartY = 650;
+
   metrics.forEach((m, i) => {
-    const x = sX + i * (cW + gap), y = 700;
-    ctx.fillStyle = "rgba(255,255,255,0.03)"; ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(x, y, cW, cH, 16); ctx.fill(); ctx.stroke();
-    ctx.font = "400 18px -apple-system, sans-serif"; ctx.fillStyle = "#64748b"; ctx.textAlign = "center"; ctx.fillText(`${m.i} ${m.l}`, x + cW / 2, y + 32);
-    ctx.font = "bold 24px -apple-system, sans-serif"; ctx.fillStyle = "#e2e8f0"; ctx.fillText(m.v, x + cW / 2, y + 65);
+    const col = i % gCols, row = Math.floor(i / gCols);
+    const x = gridStartX + col * (cardW + gGap);
+    const y = gridStartY + row * (cardH + gGap);
+
+    roundRect(x, y, cardW, cardH, 16, "rgba(255,255,255,0.03)", "rgba(255,255,255,0.06)");
+
+    // Label
+    ctx.font = "700 12px -apple-system, sans-serif";
+    ctx.fillStyle = "#475569"; ctx.textAlign = "left";
+    ctx.fillText(m.label, x + 20, y + 32);
+
+    // Value (large, right-aligned)
+    ctx.font = "800 36px -apple-system, sans-serif";
+    ctx.fillStyle = "#fff"; ctx.textAlign = "right";
+    ctx.fillText(m.value, x + cardW - 20, y + 70);
+
+    // Unit
+    if (m.unit) {
+      ctx.font = "500 16px -apple-system, sans-serif";
+      ctx.fillStyle = "#64748b";
+      ctx.fillText(m.unit, x + cardW - 20, y + 92);
+    }
   });
 
-  if (sunTimes) { ctx.font = "400 20px -apple-system, sans-serif"; ctx.fillStyle = "#64748b"; ctx.textAlign = "center"; ctx.fillText(`☀️ ${sunTimes.sunrise}  ·  🌅 ${sunTimes.sunset}`, 540, 840); }
+  // ─── Footer ───
+  const footY = 910;
+  // Divider
+  const divG = ctx.createLinearGradient(200, 0, S-200, 0);
+  divG.addColorStop(0, "transparent"); divG.addColorStop(0.5, "rgba(255,255,255,0.08)"); divG.addColorStop(1, "transparent");
+  ctx.fillStyle = divG; ctx.fillRect(0, footY, S, 1);
 
-  ctx.font = "600 20px -apple-system, sans-serif"; ctx.fillStyle = "#22d3ee"; ctx.textAlign = "center"; ctx.fillText("app.skyfe.com.br", 540, 940);
-  ctx.font = "400 16px -apple-system, sans-serif"; ctx.fillStyle = "#475569"; ctx.fillText("Baixe grátis — É seguro voar agora?", 540, 970);
-  ctx.strokeStyle = `${color}15`; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(20, 20, 1040, 1040, 24); ctx.stroke();
+  // Sunset info
+  if (sunTimes) {
+    ctx.font = "400 18px -apple-system, sans-serif";
+    ctx.fillStyle = "#475569"; ctx.textAlign = "center";
+    ctx.fillText(`☀️ ${sunTimes.sunrise}  ·  🌅 ${sunTimes.sunset}`, S/2, footY + 40);
+  }
 
+  // App link
+  ctx.font = "700 22px -apple-system, sans-serif";
+  ctx.fillStyle = "#22d3ee"; ctx.textAlign = "center";
+  ctx.fillText("app.skyfe.com.br", S/2, footY + 85);
+
+  ctx.font = "400 15px -apple-system, sans-serif";
+  ctx.fillStyle = "#334155";
+  ctx.fillText("É seguro voar agora? — Baixe grátis", S/2, footY + 112);
+
+  // Subtle outer border
+  ctx.strokeStyle = "rgba(255,255,255,0.04)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(16, 16, S-32, S-32, 20); ctx.stroke();
+
+  // Corner accent dots
+  [[40, 40], [S-40, 40], [40, S-40], [S-40, S-40]].forEach(([x, y]) => {
+    ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = `${color}30`; ctx.fill();
+  });
+
+  // Generate and share/download
   canvas.toBlob(async (blob) => {
     if (!blob) return;
     const file = new File([blob], `skyfe-score-${score}.png`, { type: "image/png" });
