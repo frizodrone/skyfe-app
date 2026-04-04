@@ -115,9 +115,23 @@ function Perfil() {
         .single();
 
       if (data) {
+        // Load drones list from localStorage (not in Supabase)
+        let savedDrones: string[] = [];
+        try {
+          const raw = localStorage.getItem("skyfe-user-drones");
+          if (raw) savedDrones = JSON.parse(raw);
+        } catch {}
+
+        const activeDrone = data.drone_model || "";
+        // Ensure active drone is in the list
+        if (activeDrone && !savedDrones.includes(activeDrone)) {
+          savedDrones = [activeDrone, ...savedDrones];
+        }
+
         const p: Profile = {
           name: data.name || "",
-          drone: data.drone_model || "",
+          drone: activeDrone,
+          drones: savedDrones,
           experience: data.experience_level || "",
         };
         setProfile(p);
