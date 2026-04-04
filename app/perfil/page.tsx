@@ -9,7 +9,7 @@ import {
 import Link from "next/link";
 import AuthGuard, { useIsLoggedIn, LoginPromptModal } from "@/lib/AuthGuard";
 import { supabase } from "@/lib/supabase";
-import { DRONE_DATABASE, searchDrones, getDroneById, type DroneModel } from "@/lib/drones";
+import { searchDrones, type DroneModel } from "@/lib/drones";
 
 type Profile = {
   name: string;

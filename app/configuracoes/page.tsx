@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ArrowLeft, Wind, Zap, CloudRain, Thermometer, RotateCcw, Save, AlertTriangle, Plane } from "lucide-react";
+import AuthGuard from "@/lib/AuthGuard";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getDroneById, type DroneModel } from "@/lib/drones";
@@ -151,4 +152,4 @@ function Configuracoes() {
   );
 }
 
-export default function ConfiguracoesWrapper() { return <Configuracoes />; }
+export default function ConfiguracoesWrapper() { return <AuthGuard><Configuracoes /></AuthGuard>; }

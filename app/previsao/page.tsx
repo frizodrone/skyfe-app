@@ -7,6 +7,7 @@ import {
   Sunrise, Sunset, Eye, Cloud,
 } from "lucide-react";
 import Link from "next/link";
+import AuthGuard from "@/lib/AuthGuard";
 import { calculateFlightScore } from "@/lib/score";
 import {
   fetchKpIndex, fetchKpForecast, getKpForTime,
@@ -21,7 +22,7 @@ const LC: Record<Level, string> = { good: "#2dffb3", warn: "#ffd84d", risk: "#ff
 type HourItem = { time: string; hour: string; score: number; level: Level; wind: number; gust: number; rainP: number; temp: number; kp: number; visibility?: number; cloudCover?: number; };
 type DayItem = { date: string; dayLabel: string; avgScore: number; bestScore: number; bestWindow: string; level: Level; minTemp: number; maxTemp: number; maxWind: number; maxGust: number; maxRain: number; sunrise?: string; sunset?: string; hours: HourItem[]; };
 
-export default function PrevisaoPage() {
+function PrevisaoPage() {
   const shared = useSharedLocation();
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<any>(null);
@@ -357,3 +358,4 @@ export default function PrevisaoPage() {
     </main>
   );
 }
+export default function PrevisaoWrapper() { return <AuthGuard><PrevisaoPage /></AuthGuard>; }

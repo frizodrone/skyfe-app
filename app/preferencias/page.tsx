@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import AuthGuard from "@/lib/AuthGuard";
 import { ArrowLeft, Globe, Ruler, Check } from "lucide-react";
 import Link from "next/link";
 
@@ -19,7 +20,7 @@ const UNITS = [
 
 const PREFS_KEY = "skyfe-preferences";
 
-export default function PreferenciasPage() {
+function PreferenciasPage() {
   const [lang, setLang] = useState("pt-BR");
   const [unitSystem, setUnitSystem] = useState("kmh");
   const [saved, setSaved] = useState(false);
@@ -97,3 +98,4 @@ export default function PreferenciasPage() {
     </main>
   );
 }
+export default function PreferenciasWrapper() { return <AuthGuard><PreferenciasPage /></AuthGuard>; }

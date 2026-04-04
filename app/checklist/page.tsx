@@ -1,5 +1,6 @@
 "use client";
 
+import AuthGuard from "@/lib/AuthGuard";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
@@ -87,7 +88,7 @@ function CircularProgress({ pct, done, total, allDone }: { pct: number; done: nu
   );
 }
 
-export default function ChecklistPage() {
+function ChecklistPage() {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -301,3 +302,4 @@ export default function ChecklistPage() {
     </main>
   );
 }
+export default function ChecklistWrapper() { return <AuthGuard><ChecklistPage /></AuthGuard>; }

@@ -146,13 +146,16 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       }
 
       // PASSO 1: Verificar se onboarding foi feito (obrigatório antes de tudo)
+      let onboardingDone = false;
       try {
-        const done = localStorage.getItem("skyfe-onboarding-done") === "true";
-        if (!done) {
-          window.location.href = "/onboarding";
-          return;
-        }
-      } catch {}
+        onboardingDone = localStorage.getItem("skyfe-onboarding-done") === "true";
+      } catch {
+        onboardingDone = false;
+      }
+      if (!onboardingDone) {
+        window.location.href = "/onboarding";
+        return;
+      }
 
       // PASSO 2: Home/Clima funciona sem login
       if (path === "/") {
