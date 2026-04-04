@@ -204,12 +204,27 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
           <h1 className="text-[24px] font-bold tracking-tight">Configurações</h1>
         </header>
 
-        {/* Intro card */}
+        {/* Intro card with active drone */}
         <div className="mb-8 rounded-[20px] border border-cyan-400/[0.15] bg-cyan-400/[0.04] p-6 shadow-[0_0_20px_rgba(45,204,255,0.06)]">
           <h2 className="mb-2 text-[17px] font-semibold text-cyan-300">Limites personalizados</h2>
           <p className="text-[13px] leading-relaxed text-slate-400">
             Defina os limites máximos aceitáveis para cada condição climática. O score de voo será calculado com base nesses valores. Pilotos mais experientes podem usar limites mais altos.
           </p>
+          {(() => {
+            try {
+              const raw = localStorage.getItem("skyfe-drone");
+              if (raw) {
+                const drone = JSON.parse(raw);
+                return (
+                  <div className="mt-4 flex items-center gap-3 rounded-[14px] border border-cyan-400/15 bg-cyan-400/[0.04] px-4 py-3">
+                    <span className="text-[13px] text-slate-500">Drone ativo:</span>
+                    <span className="text-[14px] font-semibold text-cyan-400">{drone.brand} {drone.name}</span>
+                  </div>
+                );
+              }
+            } catch {}
+            return null;
+          })()}
         </div>
 
         {/* Sliders */}
@@ -307,7 +322,7 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
                 <Wind size={14} className="text-[#2dffb3]" />
               </div>
               <p>
-                <span className="font-medium text-slate-200">Vento e rajada:</span> Drones menores (Mini, Air) são mais sensíveis. Para drones maiores (Mavic 3, Matrice), você pode aumentar os limites.
+                <span className="font-medium text-slate-200">Vento e rajada:</span> Drones menores (Mini, Air) são mais sensíveis ao vento. Para drones maiores (Mavic 3, Matrice), você pode aumentar os limites. O SkyFe mostra vento em diferentes altitudes (solo até 120m).
               </p>
             </div>
             <div className="flex gap-3">
@@ -315,7 +330,7 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
                 <CloudRain size={14} className="text-[#ffd84d]" />
               </div>
               <p>
-                <span className="font-medium text-slate-200">Chuva:</span> Qualquer probabilidade acima de 30% já representa risco para equipamentos não resistentes à água.
+                <span className="font-medium text-slate-200">Chuva:</span> Qualquer probabilidade acima de 30% já representa risco para equipamentos não resistentes à água. Se estiver chovendo, o score penaliza ainda mais.
               </p>
             </div>
             <div className="flex gap-3">
@@ -324,6 +339,22 @@ function Slider({ label, icon, value, min, max, step, unit, color, onChange }: {
               </div>
               <p>
                 <span className="font-medium text-slate-200">Temperatura:</span> Baterias LiPo perdem performance abaixo de 5°C e acima de 38°C. Ajuste conforme seu equipamento.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#a78bfa]/10">
+                <span className="text-[#a78bfa] text-[11px] font-bold">Kp</span>
+              </div>
+              <p>
+                <span className="font-medium text-slate-200">Índice Kp geomagnético:</span> Mede atividade geomagnética da Terra via satélites NOAA. Kp acima de 5 causa instabilidade no GPS, podendo resultar em perda de posição ou flyaway. O SkyFe monitora em tempo real.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#38bdf8]/10">
+                <span className="text-[#38bdf8] text-[11px] font-bold">Vis</span>
+              </div>
+              <p>
+                <span className="font-medium text-slate-200">Visibilidade e nuvens:</span> Visibilidade abaixo de 2km e cobertura de nuvens acima de 85% afetam o score. Essenciais para manter linha de visada (VLOS) conforme regulamentação da ANAC.
               </p>
             </div>
           </div>

@@ -22,7 +22,6 @@ export type DroneModel = {
 /* ═══ HELPERS ═══ */
 const GPS_GLONASS = ["GPS", "GLONASS"];
 const GPS_GLONASS_GALILEO = ["GPS", "GLONASS", "Galileo"];
-const GPS_GLONASS_GALILEO_BEIDOU = ["GPS", "GLONASS", "Galileo", "BeiDou"];
 const FULL_GNSS = ["GPS", "GLONASS", "Galileo", "BeiDou"];
 
 export const DRONE_DATABASE: DroneModel[] = [
@@ -135,24 +134,24 @@ export const DRONE_DATABASE: DroneModel[] = [
   // ═══════════════════════════════════════════
   // AUTEL ROBOTICS
   // ═══════════════════════════════════════════
-  { id: "autel-evo-nano", brand: "Autel", name: "EVO Nano", category: "consumer", maxWind: 33, maxGust: 38, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 249, maxFlightTime: 28 },
-  { id: "autel-evo-nano-plus", brand: "Autel", name: "EVO Nano+", category: "consumer", maxWind: 38, maxGust: 44, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 249, maxFlightTime: 28 },
-  { id: "autel-evo-lite", brand: "Autel", name: "EVO Lite", category: "prosumer", maxWind: 38, maxGust: 44, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 820, maxFlightTime: 40 },
-  { id: "autel-evo-lite-plus", brand: "Autel", name: "EVO Lite+", category: "prosumer", maxWind: 38, maxGust: 44, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 835, maxFlightTime: 40 },
+  { id: "autel-evo-nano", brand: "Autel", name: "EVO Nano", category: "consumer", maxWind: 33, maxGust: 38, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: FULL_GNSS, weight: 249, maxFlightTime: 28 },
+  { id: "autel-evo-nano-plus", brand: "Autel", name: "EVO Nano+", category: "consumer", maxWind: 38, maxGust: 44, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: FULL_GNSS, weight: 249, maxFlightTime: 28 },
+  { id: "autel-evo-lite", brand: "Autel", name: "EVO Lite", category: "prosumer", maxWind: 38, maxGust: 44, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: FULL_GNSS, weight: 820, maxFlightTime: 40 },
+  { id: "autel-evo-lite-plus", brand: "Autel", name: "EVO Lite+", category: "prosumer", maxWind: 38, maxGust: 44, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: FULL_GNSS, weight: 835, maxFlightTime: 40 },
   { id: "autel-evo-ii-8k", brand: "Autel", name: "EVO II 8K", category: "prosumer", maxWind: 36, maxGust: 42, minTemp: -10, maxTemp: 40, maxRain: 25, gnss: GPS_GLONASS, weight: 1150, maxFlightTime: 40 },
-  { id: "autel-evo-ii-pro-v3", brand: "Autel", name: "EVO II Pro V3", category: "prosumer", maxWind: 43, maxGust: 50, minTemp: -10, maxTemp: 40, maxRain: 25, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 1190, maxFlightTime: 38 },
-  { id: "autel-evo-ii-dual-640t-v3", brand: "Autel", name: "EVO II Dual 640T V3", category: "enterprise", maxWind: 43, maxGust: 50, minTemp: -10, maxTemp: 40, maxRain: 30, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 1250, maxFlightTime: 38 },
-  { id: "autel-evo-max-4t", brand: "Autel", name: "EVO Max 4T", category: "enterprise", maxWind: 43, maxGust: 50, minTemp: -20, maxTemp: 50, maxRain: 35, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 1164, maxFlightTime: 42 },
-  { id: "autel-evo-max-4n", brand: "Autel", name: "EVO Max 4N", category: "enterprise", maxWind: 43, maxGust: 50, minTemp: -20, maxTemp: 50, maxRain: 35, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 1164, maxFlightTime: 42 },
-  { id: "autel-dragonfish-standard", brand: "Autel", name: "Dragonfish Standard", category: "enterprise", maxWind: 54, maxGust: 62, minTemp: -20, maxTemp: 50, maxRain: 40, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 9700, maxFlightTime: 81 },
-  { id: "autel-dragonfish-pro", brand: "Autel", name: "Dragonfish Pro", category: "enterprise", maxWind: 54, maxGust: 62, minTemp: -20, maxTemp: 50, maxRain: 40, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 10500, maxFlightTime: 126 },
+  { id: "autel-evo-ii-pro-v3", brand: "Autel", name: "EVO II Pro V3", category: "prosumer", maxWind: 43, maxGust: 50, minTemp: -10, maxTemp: 40, maxRain: 25, gnss: FULL_GNSS, weight: 1190, maxFlightTime: 38 },
+  { id: "autel-evo-ii-dual-640t-v3", brand: "Autel", name: "EVO II Dual 640T V3", category: "enterprise", maxWind: 43, maxGust: 50, minTemp: -10, maxTemp: 40, maxRain: 30, gnss: FULL_GNSS, weight: 1250, maxFlightTime: 38 },
+  { id: "autel-evo-max-4t", brand: "Autel", name: "EVO Max 4T", category: "enterprise", maxWind: 43, maxGust: 50, minTemp: -20, maxTemp: 50, maxRain: 35, gnss: FULL_GNSS, weight: 1164, maxFlightTime: 42 },
+  { id: "autel-evo-max-4n", brand: "Autel", name: "EVO Max 4N", category: "enterprise", maxWind: 43, maxGust: 50, minTemp: -20, maxTemp: 50, maxRain: 35, gnss: FULL_GNSS, weight: 1164, maxFlightTime: 42 },
+  { id: "autel-dragonfish-standard", brand: "Autel", name: "Dragonfish Standard", category: "enterprise", maxWind: 54, maxGust: 62, minTemp: -20, maxTemp: 50, maxRain: 40, gnss: FULL_GNSS, weight: 9700, maxFlightTime: 81 },
+  { id: "autel-dragonfish-pro", brand: "Autel", name: "Dragonfish Pro", category: "enterprise", maxWind: 54, maxGust: 62, minTemp: -20, maxTemp: 50, maxRain: 40, gnss: FULL_GNSS, weight: 10500, maxFlightTime: 126 },
 
   // ═══════════════════════════════════════════
   // SKYDIO
   // ═══════════════════════════════════════════
   { id: "skydio-2-plus", brand: "Skydio", name: "Skydio 2+", category: "prosumer", maxWind: 36, maxGust: 42, minTemp: -10, maxTemp: 43, maxRain: 20, gnss: GPS_GLONASS, weight: 800, maxFlightTime: 27 },
   { id: "skydio-x2d", brand: "Skydio", name: "X2D", category: "enterprise", maxWind: 43, maxGust: 50, minTemp: -20, maxTemp: 50, maxRain: 35, gnss: GPS_GLONASS_GALILEO, weight: 1270, maxFlightTime: 35 },
-  { id: "skydio-x10", brand: "Skydio", name: "X10", category: "enterprise", maxWind: 46, maxGust: 54, minTemp: -20, maxTemp: 50, maxRain: 40, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 2300, maxFlightTime: 40 },
+  { id: "skydio-x10", brand: "Skydio", name: "X10", category: "enterprise", maxWind: 46, maxGust: 54, minTemp: -20, maxTemp: 50, maxRain: 40, gnss: FULL_GNSS, weight: 2300, maxFlightTime: 40 },
 
   // ═══════════════════════════════════════════
   // PARROT
@@ -165,7 +164,7 @@ export const DRONE_DATABASE: DroneModel[] = [
   // FIMI
   // ═══════════════════════════════════════════
   { id: "fimi-x8-mini-v2", brand: "FIMI", name: "X8 Mini V2", category: "consumer", maxWind: 33, maxGust: 38, minTemp: -10, maxTemp: 40, maxRain: 15, gnss: GPS_GLONASS, weight: 245, maxFlightTime: 31 },
-  { id: "fimi-x8se-2022", brand: "FIMI", name: "X8SE 2022 V2", category: "prosumer", maxWind: 36, maxGust: 42, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: GPS_GLONASS_GALILEO_BEIDOU, weight: 765, maxFlightTime: 35 },
+  { id: "fimi-x8se-2022", brand: "FIMI", name: "X8SE 2022 V2", category: "prosumer", maxWind: 36, maxGust: 42, minTemp: -10, maxTemp: 40, maxRain: 20, gnss: FULL_GNSS, weight: 765, maxFlightTime: 35 },
 
   // ═══════════════════════════════════════════
   // HUBSAN
@@ -192,11 +191,11 @@ export const DRONE_DATABASE: DroneModel[] = [
   // ═══════════════════════════════════════════
   // FPV GENÉRICOS / CUSTOMIZADOS
   // ═══════════════════════════════════════════
-  { id: "fpv-5-inch", brand: "FPV Genérico", name: "FPV 5\" (Racing/Freestyle)", category: "fpv", maxWind: 50, maxGust: 58, minTemp: -5, maxTemp: 45, maxRain: 10, gnss: ["GPS"], weight: 650, maxFlightTime: 6 },
-  { id: "fpv-7-inch", brand: "FPV Genérico", name: "FPV 7\" (Long Range)", category: "fpv", maxWind: 54, maxGust: 62, minTemp: -5, maxTemp: 45, maxRain: 10, gnss: ["GPS"], weight: 900, maxFlightTime: 15 },
-  { id: "fpv-3-inch", brand: "FPV Genérico", name: "FPV 3\" (Cinewhoop)", category: "fpv", maxWind: 36, maxGust: 42, minTemp: -5, maxTemp: 45, maxRain: 10, gnss: [], weight: 250, maxFlightTime: 5 },
-  { id: "fpv-tiny-whoop", brand: "FPV Genérico", name: "Tiny Whoop (Indoor)", category: "fpv", maxWind: 15, maxGust: 20, minTemp: 5, maxTemp: 40, maxRain: 0, gnss: [], weight: 30, maxFlightTime: 4 },
-  { id: "fpv-custom", brand: "FPV Genérico", name: "FPV Customizado", category: "fpv", maxWind: 43, maxGust: 50, minTemp: -5, maxTemp: 45, maxRain: 10, gnss: ["GPS"], weight: 700, maxFlightTime: 8 },
+  { id: "fpv-5-inch", brand: "FPV", name: "FPV 5\" (Racing/Freestyle)", category: "fpv", maxWind: 50, maxGust: 58, minTemp: -5, maxTemp: 45, maxRain: 10, gnss: ["GPS"], weight: 650, maxFlightTime: 6 },
+  { id: "fpv-7-inch", brand: "FPV", name: "FPV 7\" (Long Range)", category: "fpv", maxWind: 54, maxGust: 62, minTemp: -5, maxTemp: 45, maxRain: 10, gnss: ["GPS"], weight: 900, maxFlightTime: 15 },
+  { id: "fpv-3-inch", brand: "FPV", name: "FPV 3\" (Cinewhoop)", category: "fpv", maxWind: 36, maxGust: 42, minTemp: -5, maxTemp: 45, maxRain: 10, gnss: [], weight: 250, maxFlightTime: 5 },
+  { id: "fpv-tiny-whoop", brand: "FPV", name: "Tiny Whoop (Indoor)", category: "fpv", maxWind: 15, maxGust: 20, minTemp: 5, maxTemp: 40, maxRain: 0, gnss: [], weight: 30, maxFlightTime: 4 },
+  { id: "fpv-custom", brand: "FPV", name: "FPV Customizado", category: "fpv", maxWind: 43, maxGust: 50, minTemp: -5, maxTemp: 45, maxRain: 10, gnss: ["GPS"], weight: 700, maxFlightTime: 8 },
 
   // ═══════════════════════════════════════════
   // RYZE / TELLO

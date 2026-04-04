@@ -4,6 +4,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "SkyFe — Condições de Voo para Drones em Tempo Real",
   description: "Veja agora se é seguro voar seu drone em qualquer lugar do mundo. Score de voo, previsão de 16 dias, mapa de zonas aéreas. 100% gratuito.",
+  manifest: "/manifest.json",
+  themeColor: "#04090f",
   openGraph: {
     title: "SkyFe — Condições de Voo para Drones em Tempo Real",
     description: "Veja agora se é seguro voar seu drone em qualquer lugar do mundo. Score de voo, previsão de 16 dias e mapa de zonas aéreas.",

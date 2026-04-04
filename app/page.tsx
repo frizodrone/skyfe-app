@@ -278,7 +278,16 @@ function HomeContent() {
       const effectiveRain = (c.precipitation ?? 0) > 0 ? Math.max(rp, 80) : rp;
       const kpData = await fetchKpIndex();
       setKpIndex(kpData.kp);
-      const res = calculateFlightScore({ wind: c.wind_speed_10m, gust: c.wind_gusts_10m, rainProb: effectiveRain, temp: c.temperature_2m, kp: kpData.kp });
+      const res = calculateFlightScore({
+        wind: c.wind_speed_10m,
+        gust: c.wind_gusts_10m,
+        rainProb: effectiveRain,
+        temp: c.temperature_2m,
+        kp: kpData.kp,
+        visibility: data.hourly?.visibility?.[0],
+        cloudCover: c.cloud_cover,
+        isRaining: (c.precipitation ?? 0) > 0 || (c.rain ?? 0) > 0,
+      });
       setScore(res.score); setLabel(res.label); setLevel(res.level);
       if (name) { setPlaceName(name); } else { const geo = await reverseGeocode(lat, lon); setPlaceName(geo); }
       checkFavorite(lat, lon);
@@ -330,7 +339,7 @@ function HomeContent() {
     for (let i = 0; i < weather.hourly.time.length && items.length < 8; i++) {
       const t = new Date(weather.hourly.time[i]);
       if (t < now) continue;
-      const res = calculateFlightScore({ wind: weather.hourly.wind_speed_10m?.[i] ?? 0, gust: weather.hourly.wind_gusts_10m?.[i] ?? 0, rainProb: weather.hourly.precipitation_probability?.[i] ?? 0, temp: weather.hourly.temperature_2m?.[i] ?? 20 });
+      const res = calculateFlightScore({ wind: weather.hourly.wind_speed_10m?.[i] ?? 0, gust: weather.hourly.wind_gusts_10m?.[i] ?? 0, rainProb: weather.hourly.precipitation_probability?.[i] ?? 0, temp: weather.hourly.temperature_2m?.[i] ?? 20, kp: kpIndex, visibility: weather.hourly.visibility?.[i], cloudCover: weather.hourly.cloud_cover?.[i] });
       items.push({ time: t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), ...res });
     }
     return items;
